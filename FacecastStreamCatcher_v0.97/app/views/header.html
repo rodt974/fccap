@@ -1,0 +1,44 @@
+<!-- Logo -->
+
+<header class="clearfix">
+
+<div class="top-nav">
+<ul class="nav-left list-unstyled">
+    <li>
+        <div class="menu-button" toggle-off-canvas>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+        </div>
+
+    </li>
+</ul>
+
+<ul class="nav-button pull-right list-unstyled header-actions">
+    <div class="form-group logo-search">
+		<div data-ng-app='httpApp' data-ng-controller='httpAppCtrlr'>
+			<input type="text" class="form-control" data-ng-model="sS" ng-model-options="{ debounce: 800 }" placeholder="Search site" ng-change="doSearch(sS)">
+			<span class="icon glyphicon glyphicon-search"></span>
+			<div class="aside search-bar scrollable" id="sidebar">
+				<div class="aside-inner-fixed">
+					<div class="panel panel-default panel-transparent panel-default-clean">
+						<div class="search-window">
+							<div class="search-list">
+								<div ng-repeat="item in sD" class="search-item" data-ng-class="{online: item.liveState == 1, online: item.liveState == 0 && item.liveType >= 0, offline: item.liveState == 0}" ng-click="OB(item.userId)">
+									<div class="search-image">
+										<img src="{{item.userImg}}" alt="" class="img30_30 img-circle">
+									</div>
+									<div class="search-name">
+										<h5>{{item.userNickName}}</h5>
+										<h6>{{item.userId}}</h6>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</ul>
+</header>

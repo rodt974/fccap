@@ -1,0 +1,141 @@
+<div class="page-signup" data-ng-controller="suC">
+
+    <div class="signin-header">
+        <div class="container text-center">
+            <section class="logo-signin">
+				<div class="logo-signin-container">
+					<a href="#!/"><img src="app/images/logo.png" alt="" class="logo-icon" tooltip-placement="bottom" tooltip="Logo" tooltip-append-to-body="true"></a>
+				</div>
+					<h3>FaceCast StreamCatcher</h3>
+            </section>
+        </div>
+    </div>
+
+    <div class="main-body">
+        <div class="container">
+            <div class="form-container" ng-show="lI">
+                <span class="line-thru">Register a new account</span>
+                <span class="header-text">Before using this software, please make sure you install and enable <a href="https://addons.mozilla.org/en-US/firefox/addon/cors-everywhere/">CORS Everywhere</a> (Firefox)</span>
+				<span class="header-text">Sign up for a new Facecast Account.</br>
+				Enter your desired username, email address and password. Then click the 'Send confirmation email' button. You will receive a code from FaceCast, this can take up to 2 minutes to arrive in your mailbox. Type this code in the now visible textfield and click the 'Verify code' button.</br>If there are no errors, you now only need to press the 'Sign up' button to have the best Facecast experience you can have.</span>
+				<span class="header-text">You can even use this account to log into the official mobile app.</span>
+                <section>
+                    <form class="form-horizontal">
+						<fieldset>
+							<div class="form-group">
+								<div class="input-group">
+									<span class="input-group-addon">
+										<span class="glyphicon glyphicon-user"></span>
+									</span>
+									<input  type="text"
+											class="form-control"
+											placeholder="User name"
+											data-ng-model="mUN"
+											>
+								</div>
+							</div>
+							<div class="form-group">
+								<div class="input-group">
+									<span class="input-group-addon">
+										<span class="glyphicon glyphicon-envelope"></span>
+									</span>
+									<input type="email"
+										   class="form-control"
+										   placeholder="Email"
+										   data-ng-model="mE"
+										   >
+								</div>
+							</div>
+							<div class="form-group" ng-show="cS && !cCd">
+								<div class="input-group">
+									<span class="input-group-addon">
+										<span class="glyphicon glyphicon-ok-sign"></span>
+									</span>
+									<input  type="text"
+											class="form-control"
+											placeholder="Confirmation Code"
+											data-ng-model="myConfirmationCode"
+											>
+								</div>
+							</div>
+							<div class="form-group">
+								<div class="input-group">
+									<span class="input-group-addon">
+										<span class="glyphicon glyphicon-lock"></span>
+									</span>
+									<input type="password"
+										   class="form-control"
+										   placeholder="Password"
+										   data-ng-model="mP"
+										   >
+								</div>
+							</div>
+
+							<div class="form-group">
+								<div class="divider"></div>
+								<div style="padding-bottom:10px;" ng-show="mE && !cS">
+								<a href="#" ng-click="$event.preventDefault();sC(mE)" class="btn btn-primary btn-lg btn-block" >Send confirmation email</a>
+								</div>
+								<div style="padding-bottom:10px;" ng-show="cS && !cCd">
+								<a href="#" ng-click="$event.preventDefault();cC(mE, myConfirmationCode)" class="btn btn-primary btn-lg btn-block" >Verify code</a>
+								<div style="padding-bottom:10px;"></div>
+								</div>
+								<a href="#" ng-click="$event.preventDefault();signUp(mE, mUN, mP)" class="btn btn-lg btn-block" ng-class="{true:'btn-primary', false:'btn-default'}[cCd]" >Sign up</a>
+							</div>
+						</fieldset>
+                    </form>
+                </section>
+
+                <section>
+                    <p class="text-center text-muted">Already have an account? <a href="#" ng-click="$event.preventDefault();sSI()">Log in now</a></p>
+                </section>
+
+            </div>
+			<!-- ----------------------------------------------------------------------------- -->
+			<div class="form-container">
+				<span class="line-thru">Log in your existing account</span>
+                <span class="header-text"><h5>Before using this software, please make sure you install AND enable <a href="https://addons.mozilla.org/en-US/firefox/addon/cors-everywhere/">CORS Everywhere</a> (Firefox)</h5></span>
+				<span class="header-text">Log in to your existing Facecast Account.</br>
+				Enter the email and password you registered your Facecast account with. </br>Social Login methods like your Google account or mobile number are not supported.</br></br>If you don't have an (email based) account with Facecast yet, please make one using <a href="https://www.facecast.live/">the official app</a> on your mobile device.</br> Then simply log in with your Facecast credentials and prepare for the best Facecast experience you can have.</br></span>
+
+                <form class="form-horizontal">
+                    <fieldset>
+                        <div class="form-group">
+                            <div  style="padding-bottom:10px;" class="input-group">
+                                <span class="input-group-addon">
+                                    <span class="fa fa-user"></span>
+                                </span>
+                                <input type="email"
+										   class="form-control"
+										   placeholder="Email"
+										   data-ng-model="mE"
+										   >
+                            </div>
+							
+							 <div class="input-group">
+                                <span class="input-group-addon">
+                                    <span class="glyphicon glyphicon-lock"></span>
+                                </span>
+                                <input type="password"
+										   class="form-control"
+										   placeholder="Password"
+										   data-ng-model="mP"
+										   >
+                            </div>
+							
+                        </div>
+                       
+                        <div class="form-group">
+                        </div>
+                        <div class="form-group">
+                            <a href="#" ng-click="$event.preventDefault();signIn(mE, mP)" class="btn btn-primary btn-lg btn-block">Log in</a>
+							
+                        </div>
+                    </fieldset>
+                </form>
+
+                
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,125 @@
+
+<div data-ng-controller="FollowerListingCtrl as followerInfo">
+
+	<uib-progressbar class="progressbar-sm progress-striped active" value="FollowerSrv.progress"></uib-progressbar>
+
+	<div class="panel-sub-header">
+
+		<div class="user-stats-block">
+			<div ng-if="FollowerSrv.loading == false" class="buttons-left">
+				<button ng-click="startRefresh()" class="btn btn-primary"><i class="fa fa-refresh"></i>Reload Full List</button>
+				
+			</div>
+			
+			<div ng-if="FollowerSrv.loading == true" class="buttons-left">
+				<button ng-click="" class="btn btn-disabled"><i class="fa fa-times"></i>Please Wait..</button>
+				
+			</div>
+	<a class="btn btn-switch" href="javascript:;" data-ng-click="toggleView()" tooltip-placement="bottom" tooltip="Toggle View" tooltip-append-to-body="true">
+			<i class="fa fa-filter"></i>
+			</a>
+		</div>
+		
+
+		
+			
+
+
+		<div class="user-stats-block pull-right">
+			<div class="wrap_spinner" ng-show="FollowerSrv.loading">
+				<div class="loading outer">
+					<div class="loading inner"></div>
+				</div>
+
+			</div>
+		</div>
+
+	</div>
+	<div class="page page-follower">
+
+
+		<div class="row">
+
+			<div class="col-md-8">
+
+				<div class="panel panel-default">
+					<div class="panel-body">
+
+						<div class="row broadcast-listing">
+
+							<div data-ng-repeat="followerItem in userData track by $index" class="col-md-3">
+
+								<div class="list-item__wrap">
+									<a ng-href="#!/broadcaster/{{followerItem.account}}">
+										<div class="list-item__image ribbon-wrapper ribbon-danger">
+											<div class="ribbon-wrapper">
+												<div ng-if="followerItem.isPrivate == true" class="ribbon">
+													Private
+												</div>
+											</div>
+											<img ng-src="{{followerItem.liveData.liveImg}}"/>
+											<div ng-if="followerItem.is_tutual == 1" class="following">
+												<i class="fa fa-check">
+
+												</i>
+											</div>
+											<div class="country">
+												<img ng-src="{{followerItem.logo}}"/>
+											</div>
+										</div>
+									</a>
+									<div class="list-item__name">
+										<h5 class="color-primary">
+											{{followerItem.account}}
+										</h5>
+										<h6>
+											{{followerItem.nick_name}}
+										</h6>
+									</div>
+								</div>
+
+							</div>
+
+							
+
+						</div>
+
+					</div>
+				</div>
+
+			</div>
+
+			<div class="col-md-4">
+				<div class="panel panel-default">
+					<div class="panel-body">
+						<div class="user-stats-block pull-right">
+							<button ng-if="isFavorite == false" class="" data-ng-click="addUser()">Follow User</button>
+							<button ng-if="isFavorite == true" class="btn-primary" data-ng-click="removeUser">Follow User</button>
+						</div>
+						<h4>
+							<i class="fa fa-user color-primary"></i>About this User
+						</h4>
+						
+						<div>
+
+							<h3>
+								{{UserInfo.nickName}}
+							</h3>
+
+							<h5>
+								{{UserInfo.userId}}
+							</h5>
+							Amount Followed: {{UserInfo.attentionNum}}</br>
+							Gifted Diamonds: {{UserInfo.sendGiftDiamondNum}}</br>
+
+						</div>
+					</div>
+				</div>
+
+			</div>
+
+		</div>
+
+	</div>
+
+</div>

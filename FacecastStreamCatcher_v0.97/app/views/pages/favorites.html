@@ -1,0 +1,91 @@
+<div data-ng-controller="FavoriteListingCtrl as favoritesListing">
+	<uib-progressbar class="progressbar-sm progress-striped active" value="FollowerSrv.progress"></uib-progressbar>
+	<div class="panel-sub-header">
+
+		<div class="user-stats-block">
+			<div ng-if="FollowerSrv.loading == false" class="buttons-left">
+				<button ng-click="startRefresh()" class="btn btn-primary"><i class="fa fa-refresh"></i>Reload Full List</button>
+				
+			</div>
+			
+			<div ng-if="FollowerSrv.loading == true" class="buttons-left">
+				<button ng-click="" class="btn btn-disabled"><i class="fa fa-times"></i>Please Wait..</button>
+				
+			</div>
+
+		</div>
+
+		<div class="user-stats-block pull-right">
+			<div class="wrap_spinner" ng-show="FollowerSrv.loading">
+				<div class="loading outer">
+					<div class="loading inner"></div>
+				</div>
+
+			</div>
+		</div>
+
+	</div>
+	<div class="page page-list">
+		<div class="row">
+
+			<div class="divider-md"></div>
+
+			<div class="panel panel-default">
+				<div class="panel-body">
+
+					<div class="row broadcast-listing">
+
+						<div data-ng-repeat="followerItem in userData track by $index" class="col-md-3">
+
+							<div class="list-item__wrap ribbon-wrapper ribbon-danger">
+								<a class="list-item__play-button" ng-href="#!/broadcaster/{{followerItem.account}}">
+									<div class="list-item__image">
+										<div class="ribbon-wrapper">
+											<div ng-if="followerItem.isPrivate == true" class="ribbon">
+												Private
+											</div>
+										</div>
+										<img ng-src="{{followerItem.liveData.liveImg}}"/>
+										<div class="country">
+											<img ng-src="{{followerItem.logo}}"/>
+										</div>
+									</div>
+								</a>
+								<div class="list-item__name">
+									<h5 class="color-primary">
+										{{followerItem.account}}
+									</h5>
+									<h6>
+										{{followerItem.nick_name}}
+									</h6>
+								</div>
+
+							</div>
+
+						</div>
+
+					</div>
+					
+					<div class="empty-favoritelist" ng-hide="userData.length > 0">
+
+						<div class="empty-icon">
+							<i class="fa fa-user-plus">
+
+							</i>
+						</div>
+						<div class="empty-message">
+							No online favorite streamers found.
+						</div>
+
+						<div class="empty-message">
+							<a ng-href="#!/broadcasts" class="btn btn-primary">Search for new Streamers</a>
+						</div>
+
+					</div>
+
+				</div>
+			</div>
+
+		</div>
+	</div>
+</div>

@@ -1,0 +1,106 @@
+<!doctype html>
+<!--[if gt IE 8]><!-->
+<html class="no-js" data-ng-app="app" id="app" data-custom-background="" data-off-canvas-nav="" data-ng-controller="AdminAppCtrl"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title ng-bind="metadata.title">FaceCast StreamCatcher</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+  <link rel="icon" href="app/images/favico/favico.png" type="image/x-icon"/>
+  <link href='http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,700,600,400'
+        rel='stylesheet' type='text/css'>
+
+  <!-- Include Jquery in the vendor folder -->
+  <script src="app/js/jquery.min.js"></script>
+  <script src="app/js/hls.js"></script>
+
+  <!-- Theme's own CSS file -->
+  <!-- build:css css/app-name.min.css -->
+  <link rel="stylesheet" href="app/css/font-awesome.min.css">
+  <link rel="stylesheet" href="app/css/bootstrap.min.css">
+  <link rel="stylesheet" href="app/css/bootstrap-theme.min.css">
+  <link rel="stylesheet" href="app/css/main.min.css">
+  <!-- endbuild -->
+</head>
+<noscript>
+  <META HTTP-EQUIV="Refresh" CONTENT="0;URL=no-js.html">
+</noscript>
+<body>
+
+<div class="">
+
+  <div data-ng-hide="checkIfOwnPage()" data-ng-cloak="" class="no-print">
+    <aside data-ng-include=" 'app/views/navigation.html' " id="nav-container"></aside>
+  </div>
+
+  <div class="view-container">
+
+    <div data-ng-hide="checkIfOwnPage()" data-ng-cloak="" class="no-print">
+      <section data-ng-include=" 'app/views/header.html' " id="header" class="top-header"></section>
+    </div>
+    <section data-ng-view="" id="content" class="animate-fade-up" ng-class="{fixed:checkIfFixedPage()}"></section>
+  </div>
+
+</div>
+
+<div class="page-loading-overlay">
+  <div class="loader-2"></div>
+</div>
+
+<div class="load_circle_wrapper">
+
+  <div class="loading_spinner">
+    <div id="wrap_spinner">
+      <div class="loading outer">
+        <div class="loading inner"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!--Uncomment for deployment using Grunt
+<script type="text/javascript" src="dist/js/app.js"></script>
+
+<!--Uncomment for deployment without Grunt-->
+<!-- build:js js/app-name.min.js -->
+<script type="text/javascript" src="app/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="app/js/gmap.js"></script>
+<script type="text/javascript" src="app/js/jquery.slimscroll.min.js"></script>
+<script type="text/javascript" src="app/js/angular.min.js"></script>
+<script type="text/javascript" src="app/js/angular-animate.min.js"></script>
+<script type="text/javascript" src="app/js/angular-cookies.min.js"></script>
+<script type="text/javascript" src="app/js/angular-route.min.js"></script>
+<script type="text/javascript" src="app/js/angular-sanitize.min.js"></script>
+<script type="text/javascript" src="app/js/angular-wizard.min.js"></script>
+<script type="text/javascript" src="app/js/angular-ui-tree.min.js"></script>
+<script type="text/javascript" src="app/js/ui-bootstrap-tpls.min.js"></script>
+<script type="text/javascript" src="app/js/angular-media-player.min.js"></script>
+<script type="text/javascript" src="app/js/underscore-min.js"></script>
+<script type="text/javascript" src="app/js/jquery.vmap.min.js"></script>
+<script type="text/javascript" src="app/js/html5shiv.min.js"></script>
+<script type="text/javascript" src="app/js/angular-dragdrop.min.js"></script>
+<script type="text/javascript" src="app/js/angular-app.js"></script>
+<script type="text/javascript" src="app/js/extras.js"></script>
+<script type="text/javascript" src="app/js/parse-options.min.js"></script>
+<script type="text/javascript" src="app/js/tooltip.min.js"></script>
+<!-- endbuild -->
+</body>
+
+
+<script id="fWorker" type="javascript/worker">
+let self=this;var workerResult,bcInProgress,fInProgress;totalPage=1,determinateValue=0,endResult=[];var insert1="/",insert2="/",counter1=0,counter2=0;function getFavorites(a,e){if(e){if(!0===fInProgress)return s;var r,s=[];fInProgress=!0;for(let t=1;t<=totalPage;t++){ajax("https://dhcxzil.facecast.xyz/faceshow/user/attention/"+insert1+"listAttention",{systoken:a,userId:e,currPage:t,pageSize:5,types:0},function(e){40001==e.code&&(t=9999999),res=e.result.list;var r=[];if(totalCount=e.result.totalCount,totalPage=e.result.totalPage,currPage=e.result.currPage,determinateValue=100/totalPage*currPage,0<(r=res.filter(e=>null!=e.liveData&&1===e.liveData.isLive)).length)for(let t=0;t<r.length;t++)null==r[t].isPrivate&&ajax("https://dhcxzil.facecast.xyz/faceshow/tokens/PersonalHome/"+insert2+"findHomeUserInfo?userId="+r[t].account,{systoken:a,userId:r[t].account},function(e){r[t].is_tutual=e.result.isTutual,0==e.result.isLive&&""!=e.result.liveData.hls_url?r[t].isPrivate=!0:r[t].isPrivate=!1},"POST"),5==++counter2&&(counter2=0,insert2+="/");Array.prototype.push.apply(s,r)},"POST"),100!=determinateValue?r="notify":fInProgress=!(r="resolve");var n={type:r,determinateValue:determinateValue,workerData:s};self.postMessage(n),5==++counter1&&(counter1=0,insert1+="/")}return s}}function wait(e){for(var t=(new Date).getTime(),r=t;r<t+e;)r=(new Date).getTime()}self.onmessage=function(e){var t=e.data,r=(t.roomType,t.full,t.purpose,t.systoken),e=t.userId;t.params;favoriteResult=getFavorites(r,e)};var ajax=function(t,r,a,s){var e,n,o,u,i;for(o in null==a&&(a=function(){}),null==s&&(s="GET"),e=[],r=null==r?{}:r)i=r[o],e.push(o+"="+i);return n=e.join("&"),(u=new XMLHttpRequest).open(s,t,!1),u.setRequestHeader("Content-type","application/x-www-form-urlencoded"),u.onreadystatechange=function(){if(4===u.readyState&&200===u.status){var e=JSON.parse(this.responseText);return a(e)}429===u.status&&(wait(5e3),ajax(t,r,a,s))},u.send(n),u};
+</script>
+
+<script id="bcWorker" type="javascript/worker">
+let self=this;var workerResult,bcInProgress,fInProgress;array=[],totalPage=1,determinateValue=0,endResult=[];var insert="/",counter=0;function getBroadcasts(e,t,r,n){if(!0===o)return a;for(var a=[],s=!1,o=!0,i=1,u=!1;0==s&&0==u;){ajax("https://dhcxzil.facecast.xyz/faceshow/tokens/live/cache/"+insert+"getLiveList?param="+encodeURI('{"page": "'+i+'", "limit": "60", "typeId": "'+r+'"}'),{systoken:t,currPage:i,pageSize:20,types:0},function(e){40001==e.code&&(u=!0),0<e.result.roomList.length?(Array.prototype.push.apply(a,e.result.roomList),i++,0==n&&(o=!(s=!0),5!=r&&a.sort((e,t)=>t.onlineNum-e.onlineNum))):(o=!(s=!0),5!=r&&a.sort((e,t)=>t.onlineNum-e.onlineNum))},"POST");var l={id:e,roomType:r,type:0==s?"notify":"resolve",workerData:a};self.postMessage(l),5==++counter&&(counter=0,insert+="/")}return array}function wait(e){for(var t=(new Date).getTime(),r=t;r<t+e;)r=(new Date).getTime()}self.onmessage=function(e){var t=e.data,r=t.id,n=t.roomType,a=t.full,e=(t.purpose,t.systoken);t.userId,t.params;broadcastResult=getBroadcasts(r,e,n,a)};var ajax=function(e,t,r,n){var a,s,o,i,u;for(o in null==r&&(r=function(){}),null==n&&(n="GET"),a=[],t=null==t?{}:t)u=t[o],a.push(o+"="+u);return s=a.join("&"),(i=new XMLHttpRequest).open(n,e,!1),i.setRequestHeader("Content-type","application/x-www-form-urlencoded"),i.onreadystatechange=function(){if(4===i.readyState&&200===i.status){var e=JSON.parse(this.responseText);return r(e)}},i.send(s),i};
+</script>
+
+<script type="text/javascript">
+  localStorage.setItem("myUserId","8878046");
+  localStorage.setItem("myToken","012ea229c98d1c56d098b263ee862f1f");                       
+</script> 
+
+</html>

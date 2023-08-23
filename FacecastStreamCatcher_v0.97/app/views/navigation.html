@@ -1,0 +1,174 @@
+<!-- Logo -->
+<div class="logo" data-ng-controller="AdminAppCtrl">
+  <a class="logo-link" href="#!/pages/signup">
+    <img src="app/images/logo.png" alt="" class="logo-icon" tooltip-placement="bottom" tooltip="Logo" tooltip-append-to-body="true">
+  </a>
+  
+  <div class="logo-title">
+	<h3>FaceCast StreamCatcher v0.97</h3>
+  </div>
+  <div class="logo-title-sub">
+    <h4>Beta by <a href="https://t.me/rpaddington">Red Paddington</a></h4>
+  </div>
+      
+</div>
+
+<div id="nav-wrapper" data-ng-controller="NavCtrl as navigation">
+
+  <div class="sidebar-nav-switch">
+
+    <div class="btn-group switch">
+
+      <a class="btn main-nav-link home" ng-class="{active:navigation.navigationState.menu}" data-nav-section="home" data-ng-click="navigation.SwitchToMenu()">
+        <span class="label">BROWSE</span>
+      </a>
+
+      <a class="btn main-nav-link queue" style="padding: 6px 0px;!important" ng-class="{active:navigation.navigationState.recordings}" data-nav-section="queue" data-ng-click="navigation.SwitchToSecondary()">
+        <span class="label queue-label">
+            <span>FAVORITE USERS</span><span class="songs" ng-show="recording.current > 0"> <span class="badge badge-primary">{{recording.current}}</span></span>
+        </span>
+      </a>
+
+    </div>
+
+  </div>
+
+  <div class="sidebar-nav-main navigation-menu-container" data-slim-scroll data-ng-class="{minified:mediaPlayer.currentTrack}">
+
+    <div class="menu-navigation-menus" ng-show="navigation.navigationState.menu">
+
+      <div class="nav-user-menu sidebar-nav-content">
+
+        <ul class="sidebar-nav-menu" data-highlight-active>
+          <li id="user-menu" class="nav-item">
+
+            <a class="nav-link profile" href="#!/pages/profile">
+              <img src="{{myUserInfo.img}}" alt="" class="img20_20 img-circle">
+              <span class="label helper-tooltip-measured">{{myUserInfo.nickName}}</span>
+            </a>
+
+          </li>
+          <li id="user-menu" class="nav-item">
+            <a class="nav-link profile" href="#!/dashboard">
+              <i class="icon fa fa-inbox"></i>
+              <span class="label helper-tooltip-measured">Dashboard</span>
+            </a>
+
+          </li>
+        </ul>
+
+      </div>
+
+      <div class="nav-user-menu sidebar-nav-content">
+
+        <ul class="sidebar-nav-menu" data-highlight-active data-collapse-nav>
+		
+		<li id="user-menu" class="nav-item">
+            <a class="nav-link profile" href="javascript:;">
+              <i class="icon fa fa-video-camera"></i>
+              <span class="label helper-tooltip-measured">Broadcasts</span>
+            </a>
+            <ul>
+              <li class="nav-item">
+                <a class="nav-link profile" href="#!/broadcasts/1">
+                  <i class="icon fa fa-angle-right"></i>
+                  <span class="label helper-tooltip-measured">Popular</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link profile" href="#!/broadcasts/2">
+                  <i class="icon fa fa-angle-right"></i>
+                  <span class="label helper-tooltip-measured">Party</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link profile" href="#!/broadcasts/3">
+                  <i class="icon fa fa-angle-right"></i>
+                  <span class="label helper-tooltip-measured">Nearby</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link profile" href="#!/broadcasts/4">
+                  <i class="icon fa fa-angle-right"></i>
+                  <span class="label helper-tooltip-measured">Following</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link profile" href="#!/broadcasts/5">
+                  <i class="icon fa fa-angle-right"></i>
+                  <span class="label helper-tooltip-measured">Latest</span>
+                </a>
+              </li>
+            </ul>
+
+          </li>
+
+          <li id="user-menu" class="nav-item">
+            <a class="nav-link profile" href="#!/favorites">
+              <i class="icon fa fa-heart "></i>
+              <span class="label helper-tooltip-measured">All Favorites</span>
+            </a>
+
+          </li>
+
+        </ul>
+
+      </div>
+
+    </div>
+
+    <div class="playlist-item-list broadcaster-listing--queue" ng-show="navigation.navigationState.recordings">
+
+      <div class="broadcast-content__video">
+	  
+	    <div class="broadcaster-listing__row" ng-repeat="streamer in downloadList" ng-class="{ active: mediaPlayer.playing && mediaPlayer.currentTrack-1 === $index }"
+             ui-draggable="true" drag="song" on-drop-success="generalPlaylist.removeSong($index)" ui-on-drop="generalPlaylist.dropSong($data, $index)">
+
+          <div class="broadcaster-listing__number">
+            {{ $index+1 }}
+          </div>
+
+          <div class="broadcaster-listing__row-actions">
+            <i class="fa fa-times action" ng-click="generalPlaylist.removeSong($index)" title="Remove song"></i>
+            <i class="fa fa-list action" title="More Options..."></i>
+          </div>
+
+          <div class="broadcaster-listing__name">
+
+            <div class="broadcaster-listing__artist-name" ng-click="mediaPlayer.playPause($index)">
+			<a class="nav-link profile" href="#!/broadcaster/{{streamer.accountId}}">
+              {{ streamer.accountId }}
+			</a>
+            </div>
+            <div class="broadcaster-listing__song-name" ng-click="mediaPlayer.playPause($index)">
+              {{ streamer.userName }}
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="empty-listing" ng-hide="generalPlaylist.audioPlaylist.length">
+
+          <div class="empty-listing-icon">
+            <i class="fa fa-user-plus">
+
+            </i>
+          </div>
+          <div class="empty-listing-message">
+            This Feature will be added soon.
+          </div>
+
+          <div class="empty-listing-message">
+            <a ng-href="#!/dashboard" class="btn btn-primary btn-block btn-sm">Start</a>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>

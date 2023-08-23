@@ -1,0 +1,106 @@
+<div data-ng-controller="BroadcastListingCtrl as broadcastListing">
+
+
+	<div class="panel-sub-header">
+
+		<div class="user-stats-block">
+			<div ng-if="BroadcastsSrv.loading == false" class="buttons-left">
+				<button ng-click="fullRefresh()" class="btn btn-primary"><i class="fa fa-refresh"></i>Reload Full List</button>
+				
+			</div>
+			
+			<div ng-if="BroadcastsSrv.loading == true" class="buttons-left">
+				<button ng-click="" class="btn btn-disabled"><i class="fa fa-times"></i>Please Wait..</button>
+				
+			</div>
+			</div>
+
+		<div class="spinner-block pull-right">
+			<div class="wrap_spinner" ng-show="BroadcastsSrv.loading">
+				<div class="loading outer">
+					<div class="loading inner"></div>
+				</div>
+
+			</div>
+		</div>
+		
+		<div class="col-md-3 select pull-right">
+			<select ng-model="selectedCountry" ng-options="broadcast.country as broadcast.country for broadcast in BroadcastsSrv.data  | unique: 'country' | orderBy:'country'" name="slct" id="slct">
+				<option value="">No country selected</option>
+			</select>
+			
+			
+		</div>
+		<div class="stream-counter pull-right">
+			<ng-pluralize count="filtered.length" when="{'0': ' No result ', 'one': ' 1 result ', 'other': ' {} results '}"></ng-pluralize>
+		</div>
+
+	</div>
+
+	<div class="page page-list">
+
+		<div class="row">
+
+			<div class="panel panel-default">
+				<div class="panel-body">
+
+					<div class="row broadcast-listing">
+
+						<div data-ng-repeat="broadcastItem in BroadcastsSrv.data | filter: { country: selectedCountry } | unique:'userId' as filtered track by $index " class="col-md-3">
+							
+							<div class="list-item__wrap ribbon-wrapper ribbon-danger">
+								<a class="list-item__play-button" ng-href="#!/broadcaster/{{broadcastItem.userId}}">
+									<div class="list-item__image">
+										<div class="ribbon-wrapper">
+											<div ng-if="broadcastItem.privateType == '2'" class="ribbon">
+												Private
+											</div>
+										</div>
+										
+									
+										<img ng-src="{{broadcastItem.liveImg}}"/>
+											<div class="country">
+												<img ng-src="{{broadcastItem.logo}}"/>
+											</div>
+										<div class="count">{{broadcastItem.onlineNum}}</div>
+									</div>
+								</a>
+								<div class="list-item__name">
+									<h6 class="color-primary">
+										{{broadcastItem.userId}}
+									</h6>
+									<h6>
+										{{broadcastItem.nickName}}
+									</h6>
+								</div>
+								
+							</div>
+							
+						</div>
+
+					</div>
+					
+					<div class="empty-favoritelist" ng-hide="BroadcastsSrv.data.length > 0">
+
+						<div class="empty-icon">
+							<i class="fa fa-user-plus">
+
+							</i>
+						</div>
+						<div class="empty-message">
+							No online streamers found.
+						</div>
+
+						<div class="empty-message">
+							<a ng-href="#!/broadcasts" class="btn btn-primary">Search for new Streamers</a>
+						</div>
+
+					</div>
+
+				</div>
+			</div>
+
+		</div>
+
+	</div>
+</div>

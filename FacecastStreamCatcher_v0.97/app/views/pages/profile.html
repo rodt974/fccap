@@ -1,0 +1,78 @@
+<div data-ng-controller="ProfileCtrl">
+<section class="profile-banner">
+  <div class="panel-profile">
+    <div class="panel-heading text-center bg-info">
+      <div class="overlay_prof" style="background: url({{ProfileInfo.userImg}}) 0/cover; -webkit-filter: brightness(20%);
+    filter:brightness(20%);"></div>
+      <div class="profile_info">
+        <div class="profile-image">
+
+          <img src="{{ProfileInfo.userImg}}" alt="" class="img100_100 img-circle"/>
+          
+        </div>
+        <h3>{{ProfileInfo.userNickName}}</h3>
+        <h5>Level {{ProfileInfo.levelId}}</h5>
+      </div>
+    </div>
+    <div class="profile-sub-header">
+
+      <div class="profile-stats-block">
+        <div class="stats-label">
+          <span>
+            Diamonds
+          </span>
+        </div>
+        <div class="stats-value">
+          {{ProfileInfo.diamond}}
+        </div>
+      </div>
+
+      <div class="profile-stats-block">
+        <div class="stats-label">
+          <span>
+            Following
+          </span>
+        </div>
+        <div class="stats-value">
+          {{ProfileInfo.followNum}}
+        </div>
+      </div>
+	  
+      <div class="profile-stats-block">
+        <div class="stats-label">
+          <span>
+            Fans
+          </span>
+        </div>
+        <div class="stats-value">
+          {{ProfileInfo.fansNum}}
+        </div>
+      </div> 
+	  
+      <div class="profile-stats-block">
+        <div class="stats-label">
+          <span>
+            Memory
+          </span>
+        </div>
+        <div class="stats-value">
+          {{memory}}
+        </div>
+      </div>
+
+
+      <div ng-if="ProfileInfo.userSignIn == 0" class="profile-stats-block pull-right">
+        <button ng-click="userSignIn()" class="btn btn-primary">Sign In</button>
+	  </div>
+      <div ng-if="ProfileInfo.userSignIn == 1" class="profile-stats-block pull-right">
+        <button ng-click="userSignIn()" class="btn btn-default">Signed In</button>
+	  </div>
+
+    </div>
+
+
+  </div>
+</section>
+
+
+</div>

@@ -1,0 +1,154 @@
+<div data-ng-controller="BroadcasterCtrl as broadcasterInfo">
+<div class="page page-broadcaster">
+   <div class="row">
+      <div class="col-md-8">
+         <div class="panel panel-default ribbon-wrapper ribbon-danger">
+            <div class="ribbon-wrapper">
+               <div ng-if="isPrivate" class="ribbon">
+                  Private
+               </div>
+            </div>
+            <div class="panel-body">
+               <div class="broadcaster-listing">
+                  <div class="broadcast-content__header">
+                     <div class="broadcaster-listing__actions-top">
+                        <h3>{{PreviousStream.infoName}}</h3>
+                     </div>
+                  </div>
+                  <div class="broadcast-content__video video">
+                     <div  ng-cloak style="max-height:720px">
+                        <video height='100%' id="video" controls></video>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+      <div class="col-md-4">
+         <div class="panel panel-default">
+            <div class="panel-body">
+               <div class="user-stats-block pull-right">
+                  <button ng-if="UserInfo.isTutual == false" class="btn" data-ng-click="addFriend()">Follow</button>
+                  <button ng-if="UserInfo.isTutual > 0" class="btn btn-primary" data-ng-click="removeFriend()">Followed</button>
+               </div>
+               <h4>
+                  <i class="fa fa-user color-primary"></i>About this Broadcaster
+               </h4>
+               <div class="user-info">
+                  <h3>
+                     {{UserInfo.nickName}} <span style="color:red;" ng-show ="offline"> (Offline) </span>
+                  </h3>
+                  <h5>
+                     <span style="color:lightgrey;" ng-show ="offline"> Refreshing in {{reloadIn}} seconds. </span>
+                  </h5>
+                  <h5>
+                     <a ng-click="copyShareLink(mediaLinks.hlsUrl+' '+UserInfo.userId+' ('+UserInfo.nickName+')')">{{UserInfo.userId}}</a>
+                  </h5>
+                  <div ng-show="mediaLinks.streamId">
+                     <p><a ng-click="copyShareLink(mediaLinks.hlsUrl)">{{mediaLinks.hlsUrl}}</a><i class="fa fa-external-link-alt"></i></a><a href='{{mediaLinks.hlsUrl}}'><i class="fa fa-external-link color-primary"></i></a></br>
+                        <a ng-click="copyShareLink(mediaLinks.rtmpUrl)">{{mediaLinks.rtmpUrl}}</a><a href='{{mediaLinks.rtmpUrl}}'><i class="fa fa-external-link color-primary"></i></a>
+                     </p>
+                     <p><a href="#" ng-click="$event.preventDefault();flvDownload()">DOWNLOAD STREAM (flv)</a></br>
+                  </div>
+                  <input type="checkbox" ng-model="aFlvSave" ng-change="checked('as')"/> <span style="font-weight: bold; top: 25px;"> Autosave (next streams)</span></br>
+                  <input type="checkbox" ng-disabled="!aFlvSave" ng-model="privateSave" ng-change="checked('asp')"/> <span style="font-weight: bold; top: 25px;"> Only Private</span>
+                  </p>
+                  <p ng-show="experimental">
+                     <span uib-rating ng-model="rate" max="max" read-only="isReadonly" on-hover="hoveringOver(value)" on-leave="overStar = null" titles="['one','two','three']" aria-labelledby="default-rating"></span>
+                     <span class="label" ng-class="{'label-warning': percent<30, 'label-info': percent>=30 && percent<70, 'label-success': percent>=70}" ng-show="overStar && !isReadonly">{{percent}}%</span> (Concept)
+                     <button type="button" class="btn btn-sm btn-danger" ng-click="rate = 0" ng-disabled="isReadonly">Save</button>
+                  </p>
+               </div>
+            </div>
+         </div>
+         <div class="panel panel-default" ng-show="aRec">
+            <div class="panel-body">
+               <div class="user-stats-block pull-right">
+                  <button id="btnStart" ng-if="!isRecording && !aRec" class="btn btn-primary" data-ng-click="enableRec()">Start</button>
+                  <button id="btnStop" ng-if="isRecording" class="btn btn-danger" data-ng-click="disableRec()">Stop</button>
+                  <button id="btnStop" ng-if="!isRecording && aRec" class="btn btn-default" data-ng-click="disableRec()">Stop</button>
+                  <div style="margin-top:10px;"><input type="checkbox" ng-model="$parent.aSave" ng-change="checked()"/> <span style="font-weight: bold; top: 25px;"> Autosave </span></div>
+               </div>
+               <h4>
+                  <i class="fa fa-rocket color-primary"></i>Auto-recorded streams
+               </h4>
+               <ul id='ul'></ul>
+            </div>
+            <div id="videopv" style="margin:5px;"></div>
+         </div>
+         <div class="panel panel-default">
+            <div class="panel-body">
+               <h4>
+                  <i class="fa fa-eye color-primary"></i>{{BroadcasterSrv.broadcaster.data.result.onlineNum}} People Watching (Top Viewers)
+               </h4>
+               <div>
+                  <ul class="list-inline">
+                     <li data-ng-repeat="watcherItem in BroadcasterSrv.broadcaster.data.result.audienceList">
+                        <a class="list-item__play-button" ng-href="#!/follower/{{watcherItem.userId}}">
+                        <img src="{{watcherItem.img}}" alt="" class="img30_30 img-circle" tooltip-popup-delay="1000" tooltip-placement="bottom" uib-tooltip="{{watcherItem.account}}" tooltip-append-to-body="true">
+                        </a>
+                     </li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+         <div class="panel panel-default">
+            <div class="panel-body">
+               <h4>
+                  <i class="fa fa-bookmark color-primary"></i>{{FollowerSrv.followers.totalCount}} Following this Broadcaster
+               </h4>
+               <div>
+                  <ul class="list-inline">
+                     <li data-ng-repeat="followerItem in FollowerSrv.followers.data">
+                        <a class="list-item__play-button" ng-href="#!/follower/{{followerItem.account}}">
+                        <img src="{{followerItem.img}}" alt="" class="img30_30 img-circle" tooltip-popup-delay="1000" tooltip-placement="bottom" uib-tooltip="{{followerItem.nick_name}} ({{followerItem.account}})" tooltip-append-to-body="true">
+                        </a>
+                     </li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+           <div class="panel panel-default">
+    <div class="panel-body">
+      <h4>
+        <i class="fa fa-history color-primary"></i>Previous Stream
+      </h4>
+		<p>Date: {{PreviousStream.startTime | date:'yyyy-MM-dd HH:mm:ss Z'}}</br>
+		Coins Earned: {{PreviousStream.fcoin}}</br>
+		Total Viewers: {{PreviousStream.onlineNum}}</br>
+		</p>
+  
+		 <div ng-show="!liveHistory">
+		 <a href="#" class="pull-right" ng-click="$event.preventDefault();showOldStreams()">Show more</a><i class="fa fa-external-link-alt"></i></a>
+		 </div>
+		 
+		 <div ng-show="liveHistory">
+		 <a href="#" class="pull-right" ng-click="$event.preventDefault();hideOldStreams()">Hide more</a><i class="fa fa-external-link-alt"></i></a>
+		 </div>
+		 
+    
+	<div ng-show="liveHistory">
+    <div data-ng-repeat="stream in liveHistory | orderBy:'-start_time' | groupBy:'start_time'">
+
+		<h4 ng-show="stream.group_by_CHANGED">
+			{{stream.start_time}} 
+		</h4>
+<div>
+	<p>
+		<span class="groupValue">Time: {{stream.stime| limitTo : -8}} - {{stream.etime| limitTo : -8}}</span></br>	
+		<span class="groupValue">Stream Duration: {{stream.intervals}}</span></br>
+		<span class="groupValue">Followers Gained: {{stream.addFansVideo}}</span></br>	
+		<span class="groupValue">Coins Earned: {{stream.addPrice}}</span></br>	
+		<span class="groupValue">Total Viewers: {{stream.online_num}}</span>
+	</p>
+</div>			
+<div class="divider"></div>
+	</div>
+	
+  </div>
+</div>
+</div>
+      </div>
+   </div>
+</div>
+

@@ -1,0 +1,139 @@
+<div class="page page-full page-dashboard two-column">
+
+  <section class="inner-wrapper scrollable">
+
+    <div class="inner-page">
+
+      <section class="dashboard-banner">
+
+        <div class="dashboard-banner__content">
+          <h2>
+            Find the best streams on FaceCast!
+          </h2>
+
+          <h5>
+            <p>Thank you for using the FaceCast StreamCatcher BETA.</p>
+            <p>You are one of the very few people being able to use this app.</br>Do not share this with anyone else, or it might get blocked by FaceCast and you won't be able to use it anymore.</p>
+            
+            <p>If you have any problems or feature requests;</p>
+          </h5>
+        <a class="btn btn-primary" href="https://t.me/rpaddington">
+          contact me
+        </a>
+
+      </div>
+
+    </section>
+
+    <section>
+      <section class="panel panel-default panel-default-clean">
+        <div class="panel-body panel-body--dashboard">
+
+          <tabset class="ui-tab">
+            <tab heading="Popular Streams">
+
+              <div class="profile-stats-block pull-right">
+                <a class="btn btn-primary" href="#!/broadcasts/1">
+                  Check all streams
+                </a>
+              </div>
+              <h4>
+                <i class="fa fa-list color-primary"></i>Popular streams
+              </h4>
+
+              <div class="divider"></div>
+
+              <div data-ng-controller="BroadcastListingCtrl as broadcastListing">
+                <div class="row broadcast-listing minified">
+
+                  <div data-ng-repeat="broadcastItem in BroadcastsSrv.data | limitTo:21" class="col-md-3">
+
+                    <div class="list-item__wrap">
+						<a class="list-item__play-button" ng-href="#!/broadcaster/{{broadcastItem.userId}}">
+						  <div class="list-item__image">
+							<img ng-src="{{broadcastItem.img}}"/>
+								<div class="country">
+									<img ng-src="{{broadcastItem.logo}}"/>
+								</div>
+							<div class="count">{{broadcastItem.onlineNum}}</div>
+						  </div>
+						</a>
+                      <div class="list-item__name">
+                        <h6 class="color-primary">
+                          {{broadcastItem.userId}}
+                        </h6>
+                        <h6>
+                          {{broadcastItem.nickName}}
+                        </h6>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              </div>
+
+            </tab>
+
+            <tab heading="Favorite Streams">
+
+              <div class="profile-stats-block pull-right">
+                <a class="btn btn-primary" href="#!/favorites">
+                  Check all your Favorites
+                </a>
+              </div>
+              <h4>
+                <i class="fa fa-list color-primary"></i>Favorites
+              </h4>
+              
+              <div class="divider"></div>
+
+              <div data-ng-controller="FavoriteListingCtrl as favoriteListing">
+                <div class="row broadcast-listing minified">
+
+                  <div data-ng-repeat="followerItem in userData | limitTo:7" class="col-md-3">
+
+                    <div class="list-item__wrap ribbon-wrapper ribbon-danger">
+						<a class="list-item__play-button" ng-href="#!/broadcaster/{{followerItem.account}}">
+						  <div class="list-item__image">
+						   <div class="ribbon-wrapper">
+							 <div ng-if="followerItem.isPrivate == true" class="ribbon">
+							  Private
+							</div>
+						  </div>
+						  <img ng-src="{{followerItem.img}}"/>
+						  <div class="country">
+							<img ng-src="{{followerItem.logo}}"/>
+						  </div>
+					   </div>
+					</a>
+                   <div class="list-item__name">
+                    <h6 class="color-primary">
+                      {{followerItem.account}}
+                    </h6>
+                    <h6>
+                      {{followerItem.nick_name}}
+                    </h6>
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+        </tab>
+
+      </tabset>
+
+    </div>
+  </section>
+</section>
+
+</div>
+
+</section>
+
+</div>
