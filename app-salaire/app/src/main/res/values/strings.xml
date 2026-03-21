@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">App Salaire</string>
+    <string name="titre_salaire_brut">Salaire Brut Mensuel (€)</string>
+    <string name="titre_heures">Heures travaillées par semaine</string>
+    <string name="titre_taux_horaire">Taux horaire (€)</string>
+    <string name="titre_prime">Prime mensuelle (€)</string>
+    <string name="btn_calculer">Calculer</string>
+    <string name="btn_reinitialiser">Réinitialiser</string>
+    <string name="resultat_brut">Salaire Brut :</string>
+    <string name="resultat_net">Salaire Net :</string>
+    <string name="resultat_annuel_brut">Salaire Annuel Brut :</string>
+    <string name="resultat_annuel_net">Salaire Annuel Net :</string>
+    <string name="resultat_cotisations">Cotisations sociales :</string>
+    <string name="hint_salaire_brut">Ex: 2500</string>
+    <string name="hint_heures">Ex: 35</string>
+    <string name="hint_taux">Ex: 15.50</string>
+    <string name="hint_prime">Ex: 200</string>
+    <string name="mode_brut_net">Brut → Net</string>
+    <string name="mode_taux_horaire">Taux Horaire</string>
+</resources>
