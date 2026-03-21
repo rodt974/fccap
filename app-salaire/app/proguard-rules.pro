@@ -1,6 +1,0 @@
-# Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in the Android SDK tools proguard configuration.
-
--keepattributes *Annotation*
--keep class com.salaire.app.** { *; }

@@ -1,0 +1,8 @@
+{
+  "appId": "com.mesheures.interim",
+  "appName": "Mes Heures Intérim",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
