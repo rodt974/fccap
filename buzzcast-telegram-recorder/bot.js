@@ -1,546 +1,521 @@
 const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const { spawn } = require('child_process');
 const FormData = require('form-data');
-const FacecastAPI = require('./facecast-api');
 
 // ============================================================
-//  CONFIG - Remplis ces 2 valeurs et lance: node bot.js
+//  USAGE:  BOT_TOKEN=ton_token node bot.js
+//  Le chat ID admin est auto-detecte au premier /start
 // ============================================================
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '';
-// ============================================================
-
 const TG = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const RECORDINGS_DIR = path.join(__dirname, 'recordings');
 fs.ensureDirSync(RECORDINGS_DIR);
 
-// State
-let facecastApi = null;
-let watchList = new Map();       // broadcasterId -> { nickName }
-let streamStates = new Map();    // broadcasterId -> { live, recording, file, ... }
+// ============================================================
+//  FACECAST API (tout integre, pas de fichier externe)
+// ============================================================
+const FC_BASE = 'https://dhcxzil.facecast.xyz/faceshow';
+const FC_LIVE = 'https://live.facecast.xyz/live';
+const rndSlash = () => '/'.repeat(Math.floor(Math.random() * 10));
+
+const fc = {
+  api: null, // { userId, token }
+
+  async login(email, pwd) {
+    const res = await axios.post(`${FC_BASE}/api/sys/login/v2`, null, {
+      params: { deviceId: '214035648725148', email, pwd, type: 2 }
+    });
+    const d = res.data;
+    if (d.code === '40007' || d.msg !== 'Login successfully') throw new Error(d.msg || 'Login failed');
+    return { userId: String(d.result.userId), token: d.result.token, nickName: d.result.nickName || '' };
+  },
+
+  async userInfo(uid) {
+    const res = await axios.post(`${FC_BASE}/tokens/PersonalHome/${rndSlash()}findHomeUserInfo?userId=${uid}`, null, {
+      params: { systoken: this.api.token, userId: uid }
+    });
+    return res.data;
+  },
+
+  async liveInfo(uid) {
+    const res = await axios.get(`${FC_BASE}/tokens/ranking/v2/getLastLiveInfoByUserId?liveUserId=${uid}`);
+    return res.data;
+  },
+
+  async favorites(page = 1) {
+    const res = await axios.post(`${FC_BASE}/user/attention/${rndSlash()}listAttention`, null, {
+      params: { systoken: this.api.token, userId: this.api.userId, currPage: page, pageSize: 20, types: 0 }
+    });
+    return res.data;
+  },
+
+  isLive(info) { try { return info.result.isLive === 1; } catch { return false; } },
+  isPrivate(info) {
+    try { const r = info.result; return r.liveData.flv_url !== '' && r.isLive === 0; } catch { return false; }
+  },
+  nick(info) { try { return info.result.nickName; } catch { return '?'; } },
+  streamId(info) { try { return info.result.streamId; } catch { return null; } },
+  flvUrl(sid) { return `${FC_LIVE}/${sid}.flv`; }
+};
+
+// ============================================================
+//  STATE
+// ============================================================
+let adminChatId = process.env.ADMIN_CHAT_ID || '';
+let watchList = new Map();
+let streams = new Map();
 let pollInterval = 30;
 let onlyPrivate = true;
 let monitoring = false;
 let pollTimer = null;
 let configState = {};
+let activeDownloads = new Map(); // userId -> { controller, filepath }
 
 // ============================================================
-//  TELEGRAM BOT (long polling)
+//  TELEGRAM HELPERS
 // ============================================================
-
 let offset = 0;
 
-async function pollTelegram() {
+async function poll() {
   while (true) {
     try {
-      const res = await axios.get(`${TG}/getUpdates`, {
-        params: { offset, timeout: 30 },
-        timeout: 35000
-      });
-      const updates = res.data.result || [];
-      for (const update of updates) {
-        offset = update.update_id + 1;
-        if (update.message) await handleMessage(update.message);
-        else if (update.callback_query) await handleCallback(update.callback_query);
+      const res = await axios.get(`${TG}/getUpdates`, { params: { offset, timeout: 30 }, timeout: 35000 });
+      for (const u of (res.data.result || [])) {
+        offset = u.update_id + 1;
+        if (u.message) await onMsg(u.message);
+        else if (u.callback_query) await onCb(u.callback_query);
       }
-    } catch (err) {
-      if (err.code !== 'ECONNABORTED') console.error('[TG] Poll error:', err.message);
+    } catch (e) {
+      if (e.code !== 'ECONNABORTED') console.error('[TG]', e.message);
       await sleep(3000);
     }
   }
 }
 
-async function sendMsg(chatId, text, opts = {}) {
+async function send(chatId, text, opts = {}) {
   try {
-    const res = await axios.post(`${TG}/sendMessage`, { chat_id: chatId, text, parse_mode: 'HTML', ...opts });
-    return res.data.result;
-  } catch (err) {
-    console.error('[TG] sendMsg error:', err.message);
-  }
+    return (await axios.post(`${TG}/sendMessage`, { chat_id: chatId, text, parse_mode: 'HTML', ...opts })).data.result;
+  } catch (e) { console.error('[TG] send:', e.message); }
 }
 
-async function sendVideo(chatId, filepath, caption) {
+async function sendFile(chatId, filepath, caption) {
   const stat = fs.statSync(filepath);
-  const sizeMB = stat.size / (1024 * 1024);
+  const mb = stat.size / 1048576;
   const form = new FormData();
   form.append('chat_id', String(chatId));
   if (caption) form.append('caption', caption.substring(0, 1024));
 
-  if (sizeMB > 50) {
-    form.append('document', fs.createReadStream(filepath));
-    await axios.post(`${TG}/sendDocument`, form, {
+  const method = mb > 50 ? 'sendDocument' : 'sendVideo';
+  const field = mb > 50 ? 'document' : 'video';
+  form.append(field, fs.createReadStream(filepath));
+
+  try {
+    await axios.post(`${TG}/${method}`, form, {
       headers: form.getHeaders(), maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 600000
     });
-  } else {
-    form.append('video', fs.createReadStream(filepath));
-    try {
-      await axios.post(`${TG}/sendVideo`, form, {
-        headers: form.getHeaders(), maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 600000
-      });
-    } catch {
-      const form2 = new FormData();
-      form2.append('chat_id', String(chatId));
-      if (caption) form2.append('caption', caption.substring(0, 1024));
-      form2.append('document', fs.createReadStream(filepath));
-      await axios.post(`${TG}/sendDocument`, form2, {
-        headers: form2.getHeaders(), maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 600000
+  } catch {
+    if (method === 'sendVideo') {
+      const f2 = new FormData();
+      f2.append('chat_id', String(chatId));
+      if (caption) f2.append('caption', caption.substring(0, 1024));
+      f2.append('document', fs.createReadStream(filepath));
+      await axios.post(`${TG}/sendDocument`, f2, {
+        headers: f2.getHeaders(), maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 600000
       });
     }
   }
 }
 
-async function answerCallback(callbackId, text) {
-  try { await axios.post(`${TG}/answerCallbackQuery`, { callback_query_id: callbackId, text }); } catch {}
+async function delMsg(chatId, msgId) {
+  try { await axios.post(`${TG}/deleteMessage`, { chat_id: chatId, message_id: msgId }); } catch {}
+}
+
+async function ansCb(id) {
+  try { await axios.post(`${TG}/answerCallbackQuery`, { callback_query_id: id }); } catch {}
+}
+
+// ============================================================
+//  STREAM DOWNLOAD (pur HTTP, pas de ffmpeg)
+// ============================================================
+
+function startDownload(userId, nickName, streamId) {
+  if (activeDownloads.has(userId)) return null;
+
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  const filename = `BC-${userId}-${nickName}-${streamId}-${ts}.flv`;
+  const filepath = path.join(RECORDINGS_DIR, filename);
+  const url = fc.flvUrl(streamId);
+
+  const controller = new AbortController();
+
+  const download = async () => {
+    try {
+      const res = await axios.get(url, {
+        responseType: 'stream',
+        signal: controller.signal,
+        timeout: 0 // pas de timeout pour le streaming
+      });
+      const writer = fs.createWriteStream(filepath);
+      res.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+        res.data.on('error', reject);
+      });
+    } catch (e) {
+      if (e.code !== 'ERR_CANCELED') console.log(`[DL] ${userId} ended:`, e.message);
+    }
+  };
+
+  download();
+  activeDownloads.set(userId, { controller, filepath, filename });
+  return { filepath, filename };
+}
+
+function stopDownload(userId) {
+  const dl = activeDownloads.get(userId);
+  if (!dl) return null;
+  dl.controller.abort();
+  activeDownloads.delete(userId);
+  return dl;
 }
 
 // ============================================================
 //  MESSAGE HANDLER
 // ============================================================
 
-async function handleMessage(msg) {
+async function onMsg(msg) {
   const chatId = msg.chat.id;
   const text = (msg.text || '').trim();
 
-  if (ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
-    await sendMsg(chatId, "Acces refuse.");
-    return;
+  // Auto-detect admin
+  if (!adminChatId) {
+    adminChatId = String(chatId);
+    console.log(`[BOT] Admin set: ${adminChatId}`);
   }
 
-  if (configState[chatId]) {
-    await handleConfigStep(chatId, text);
-    return;
-  }
+  if (String(chatId) !== String(adminChatId)) { await send(chatId, 'Acces refuse.'); return; }
 
-  const cmd = text.split(' ')[0].toLowerCase();
-  const args = text.substring(cmd.length).trim();
+  // Config/login flow
+  if (configState[chatId]) { await configStep(chatId, text, msg.message_id); return; }
 
-  switch (cmd) {
-    case '/start':
-    case '/help':
-      await showHelp(chatId);
-      break;
-    case '/config':
-      await startConfig(chatId);
-      break;
-    case '/login':
-      await startLogin(chatId);
-      break;
-    case '/watch':
-      await addWatch(chatId, args);
-      break;
-    case '/unwatch':
-      await removeWatch(chatId, args);
-      break;
-    case '/list':
-      await showList(chatId);
-      break;
-    case '/go':
-      await startMonitoring(chatId);
-      break;
-    case '/stop':
-      await stopMonitoring(chatId);
-      break;
-    case '/status':
-      await showStatus(chatId);
-      break;
+  const [cmd, ...rest] = text.split(' ');
+  const args = rest.join(' ').trim();
+
+  switch (cmd.toLowerCase()) {
+    case '/start': case '/help': return help(chatId);
+    case '/login': return loginStart(chatId);
+    case '/config': return configStart(chatId);
+    case '/watch': return watch(chatId, args);
+    case '/unwatch': return unwatch(chatId, args);
+    case '/list': return list(chatId);
+    case '/favorites': return favs(chatId);
+    case '/go': return go(chatId);
+    case '/stop': return stop(chatId);
+    case '/status': return status(chatId);
     case '/private':
       onlyPrivate = !onlyPrivate;
-      await sendMsg(chatId, `Mode prives uniquement: <b>${onlyPrivate ? 'OUI' : 'NON'}</b>`);
-      break;
+      return send(chatId, `Mode prives: <b>${onlyPrivate ? 'ON' : 'OFF'}</b>`);
     case '/interval':
       if (args && !isNaN(args)) {
         pollInterval = Math.max(10, parseInt(args));
-        await sendMsg(chatId, `Intervalle: <b>${pollInterval}s</b>`);
-        if (monitoring) { stopPoll(); startPoll(); }
-      } else {
-        await sendMsg(chatId, `Intervalle actuel: <b>${pollInterval}s</b>\nUsage: /interval 30`);
+        if (monitoring) { clearInterval(pollTimer); startPoll(); }
+        return send(chatId, `Intervalle: <b>${pollInterval}s</b>`);
       }
-      break;
-    case '/favorites':
-      await loadFavorites(chatId);
-      break;
+      return send(chatId, `Actuel: ${pollInterval}s\nUsage: /interval 30`);
     default:
-      if (/^\d{4,}$/.test(text)) await addWatch(chatId, text);
-      else await showHelp(chatId);
+      if (/^\d{4,}$/.test(text)) return watch(chatId, text);
+      return help(chatId);
   }
 }
 
-async function handleCallback(query) {
-  const chatId = query.message.chat.id;
-  await answerCallback(query.id);
-  if (query.data === 'go') await startMonitoring(chatId);
-  else if (query.data === 'stop') await stopMonitoring(chatId);
-  else if (query.data === 'list') await showList(chatId);
-  else if (query.data === 'toggle_private') {
-    onlyPrivate = !onlyPrivate;
-    await sendMsg(chatId, `Mode prives uniquement: <b>${onlyPrivate ? 'OUI' : 'NON'}</b>`);
-  }
+async function onCb(q) {
+  const chatId = q.message.chat.id;
+  await ansCb(q.id);
+  if (q.data === 'go') go(chatId);
+  else if (q.data === 'stop') stop(chatId);
+  else if (q.data === 'list') list(chatId);
+  else if (q.data === 'tp') { onlyPrivate = !onlyPrivate; send(chatId, `Prives: <b>${onlyPrivate ? 'ON' : 'OFF'}</b>`); }
 }
 
 // ============================================================
 //  COMMANDS
 // ============================================================
 
-async function showHelp(chatId) {
-  const text = `<b>🔴 BuzzCast Private Recorder</b>
+function help(chatId) {
+  return send(chatId, `<b>🔴 BuzzCast Recorder</b>
 
-Enregistre automatiquement les streams prives auxquels tu es invite et te les envoie ici.
+Enregistre les streams prives et te les envoie ici.
 
 <b>⚙️ Setup:</b>
-/login - Connecte-toi avec email + mdp BuzzCast
-/config - Config manuelle (userId + token)
-/watch &lt;userId&gt; - Surveiller un broadcaster
-/favorites - Charger tes favoris BuzzCast
+/login - Connexion email + mdp
+/watch &lt;id&gt; - Surveiller un broadcaster
+/favorites - Charger tes favoris
 
 <b>▶️ Controle:</b>
-/go - Demarrer la surveillance
+/go - Demarrer
 /stop - Arreter
-/status - Etat actuel
-/list - Voir la watchlist
+/status - Etat
+/list - Watchlist
 
 <b>🔧 Options:</b>
-/private - Toggle prives uniquement (${onlyPrivate ? 'ON' : 'OFF'})
-/interval &lt;sec&gt; - Intervalle de check (${pollInterval}s)
+/private - Prives uniquement (${onlyPrivate ? 'ON' : 'OFF'})
+/interval &lt;sec&gt; - Intervalle (${pollInterval}s)
 
-<i>Quand un broadcaster de ta liste lance un prive et que tu es invite, le bot enregistre le stream et te l'envoie ici!</i>`;
-
-  await sendMsg(chatId, text, {
-    reply_markup: JSON.stringify({
-      inline_keyboard: [[
-        { text: monitoring ? '⏹ Stop' : '▶️ Go', callback_data: monitoring ? 'stop' : 'go' },
-        { text: '📋 Liste', callback_data: 'list' },
-        { text: onlyPrivate ? '🔒 Prives' : '🔓 Tout', callback_data: 'toggle_private' }
-      ]]
-    })
+<i>Envoie un ID direct pour l'ajouter.</i>`, {
+    reply_markup: JSON.stringify({ inline_keyboard: [[
+      { text: monitoring ? '⏹ Stop' : '▶️ Go', callback_data: monitoring ? 'stop' : 'go' },
+      { text: '📋 Liste', callback_data: 'list' },
+      { text: onlyPrivate ? '🔒 Prives' : '🔓 Tout', callback_data: 'tp' }
+    ]]})
   });
 }
 
-async function startLogin(chatId) {
-  configState[chatId] = { step: 'login_email' };
-  await sendMsg(chatId, `<b>🔐 Login BuzzCast</b>\n\nEnvoie ton <b>email</b> BuzzCast:\n\n<i>/cancel pour annuler</i>`);
+function loginStart(chatId) {
+  configState[chatId] = { step: 'email' };
+  return send(chatId, `<b>🔐 Login BuzzCast</b>\n\nEnvoie ton <b>email</b>:\n\n/cancel pour annuler`);
 }
 
-async function startConfig(chatId) {
+function configStart(chatId) {
   configState[chatId] = { step: 'userId' };
-  await sendMsg(chatId, `<b>Configuration manuelle</b>\n\nEnvoie ton <b>User ID</b> BuzzCast:\n<i>(si tu as deja ton token, sinon utilise /login)</i>`);
+  return send(chatId, `<b>Config manuelle</b>\n\nEnvoie ton <b>User ID</b>:\n\n/cancel pour annuler`);
 }
 
-async function handleConfigStep(chatId, text) {
-  const state = configState[chatId];
-  if (text === '/cancel') { delete configState[chatId]; await sendMsg(chatId, 'Annule.'); return; }
+async function configStep(chatId, text, msgId) {
+  const s = configState[chatId];
+  if (text === '/cancel') { delete configState[chatId]; return send(chatId, 'Annule.'); }
 
-  // Login flow
-  if (state.step === 'login_email') {
-    state.email = text;
-    state.step = 'login_password';
-    await sendMsg(chatId, `Email: <b>${text}</b>\n\nMaintenant envoie ton <b>mot de passe</b>:\n\n<i>(le message sera supprime apres lecture)</i>`);
-    return;
+  // LOGIN FLOW
+  if (s.step === 'email') {
+    s.email = text;
+    s.step = 'password';
+    return send(chatId, `Email: <b>${text}</b>\n\nEnvoie ton <b>mot de passe</b>:`);
   }
-
-  if (state.step === 'login_password') {
-    // Try to delete the password message for security
+  if (s.step === 'password') {
+    delMsg(chatId, msgId); // supprime le mdp du chat
+    await send(chatId, '⏳ Connexion...');
     try {
-      await axios.post(`${TG}/deleteMessage`, { chat_id: chatId, message_id: state.lastMsgId || 0 });
-    } catch {}
-
-    await sendMsg(chatId, '⏳ Connexion en cours...');
-
-    try {
-      const result = await FacecastAPI.login(state.email, text);
-      facecastApi = new FacecastAPI(result.userId, result.token);
+      const r = await fc.login(s.email, text);
+      fc.api = { userId: r.userId, token: r.token };
       delete configState[chatId];
-
-      await sendMsg(chatId, `✅ <b>Connecte!</b>\n\nUser: <b>${result.nickName}</b>\nID: <code>${result.userId}</code>\nToken: <code>${result.token.substring(0, 8)}...</code>\n\n/favorites pour charger tes favoris\n/watch &lt;id&gt; pour ajouter un broadcaster\n/go pour demarrer!`);
-    } catch (err) {
+      return send(chatId, `✅ <b>Connecte!</b>\n\n👤 <b>${r.nickName}</b>\nID: <code>${r.userId}</code>\n\n/favorites pour charger tes favs\n/go pour demarrer`);
+    } catch (e) {
       delete configState[chatId];
-      await sendMsg(chatId, `❌ Login echoue: ${err.message}\n\nVerifie email/mot de passe et reessaie avec /login`);
+      return send(chatId, `❌ Echec: ${e.message}\n\n/login pour reessayer`);
     }
-    return;
   }
 
-  // Manual config flow
-  if (state.step === 'userId') {
-    state.userId = text;
-    state.step = 'token';
-    await sendMsg(chatId, `User ID: <b>${text}</b>\n\nMaintenant envoie ton <b>Token</b>:`);
-  } else if (state.step === 'token') {
-    facecastApi = new FacecastAPI(state.userId, text);
+  // MANUAL CONFIG FLOW
+  if (s.step === 'userId') {
+    s.userId = text;
+    s.step = 'token';
+    return send(chatId, `ID: <b>${text}</b>\n\nEnvoie ton <b>token</b>:`);
+  }
+  if (s.step === 'token') {
+    fc.api = { userId: s.userId, token: text };
     delete configState[chatId];
     try {
-      const info = await facecastApi.getUserInfo(state.userId);
-      const nick = info?.result?.nickName || 'inconnu';
-      await sendMsg(chatId, `✅ Connecte: <b>${nick}</b> (${state.userId})\n\n/favorites pour charger tes favoris\n/watch &lt;id&gt; pour ajouter un user\nPuis /go pour demarrer!`);
-    } catch (err) {
-      await sendMsg(chatId, `⚠️ Config sauvee mais test echoue: ${err.message}\nVerifie avec /config`);
+      const info = await fc.userInfo(s.userId);
+      return send(chatId, `✅ Connecte: <b>${fc.nick(info)}</b>\n\n/favorites ou /go`);
+    } catch (e) {
+      return send(chatId, `⚠️ Sauve mais test echoue: ${e.message}`);
     }
   }
 }
 
-async function addWatch(chatId, userId) {
-  if (!userId) { await sendMsg(chatId, 'Usage: /watch &lt;userId&gt;'); return; }
-  userId = userId.trim();
-  if (watchList.has(userId)) { await sendMsg(chatId, `Deja dans la liste.`); return; }
-
-  let nickName = userId;
-  if (facecastApi) {
-    try {
-      const info = await facecastApi.getUserInfo(userId);
-      if (info?.result?.nickName) nickName = info.result.nickName;
-    } catch {}
-  }
-  watchList.set(userId, { nickName });
-  await sendMsg(chatId, `✅ Ajoute: <b>${nickName}</b> (${userId})\nTotal: ${watchList.size}`);
+async function watch(chatId, uid) {
+  if (!uid) return send(chatId, 'Usage: /watch &lt;userId&gt;');
+  uid = uid.trim();
+  if (watchList.has(uid)) return send(chatId, 'Deja dans la liste.');
+  let nick = uid;
+  if (fc.api) { try { nick = fc.nick(await fc.userInfo(uid)); } catch {} }
+  watchList.set(uid, { nickName: nick });
+  return send(chatId, `✅ <b>${nick}</b> (${uid}) ajoute\nTotal: ${watchList.size}`);
 }
 
-async function removeWatch(chatId, userId) {
-  if (!userId) { await sendMsg(chatId, 'Usage: /unwatch &lt;userId&gt;'); return; }
-  userId = userId.trim();
-  if (watchList.delete(userId)) {
-    if (streamStates.has(userId)) { await stopRecording(userId); streamStates.delete(userId); }
-    await sendMsg(chatId, `❌ Retire: ${userId}\nTotal: ${watchList.size}`);
-  } else {
-    await sendMsg(chatId, `Pas dans la liste.`);
-  }
+async function unwatch(chatId, uid) {
+  if (!uid) return send(chatId, 'Usage: /unwatch &lt;userId&gt;');
+  uid = uid.trim();
+  if (!watchList.delete(uid)) return send(chatId, 'Pas dans la liste.');
+  if (streams.has(uid)) { stopDownload(uid); streams.delete(uid); }
+  return send(chatId, `❌ ${uid} retire. Total: ${watchList.size}`);
 }
 
-async function showList(chatId) {
-  if (watchList.size === 0) { await sendMsg(chatId, 'Liste vide. /watch ou /favorites'); return; }
-  let text = `<b>📋 Watchlist (${watchList.size})</b>\n\n`;
-  for (const [uid, data] of watchList) {
-    const s = streamStates.get(uid);
-    let icon = '⚫';
-    if (s?.recording) icon = '🔴 REC';
-    else if (s?.live) icon = '🟢';
-    text += `${icon} <b>${data.nickName}</b> (${uid})\n`;
+async function list(chatId) {
+  if (!watchList.size) return send(chatId, 'Liste vide. /watch ou /favorites');
+  let t = `<b>📋 Watchlist (${watchList.size})</b>\n\n`;
+  for (const [uid, d] of watchList) {
+    const s = streams.get(uid);
+    const i = s?.recording ? '🔴' : s?.live ? '🟢' : '⚫';
+    t += `${i} <b>${d.nickName}</b> (${uid})\n`;
   }
-  await sendMsg(chatId, text);
+  return send(chatId, t);
 }
 
-async function loadFavorites(chatId) {
-  if (!facecastApi) { await sendMsg(chatId, '/config d\'abord'); return; }
-  await sendMsg(chatId, '⏳ Chargement des favoris...');
+async function favs(chatId) {
+  if (!fc.api) return send(chatId, '/login d\'abord');
+  await send(chatId, '⏳ Chargement...');
   try {
-    let page = 1, totalPages = 1, added = 0;
-    while (page <= totalPages) {
-      const data = await facecastApi.getFavorites(page);
-      if (!data?.result) break;
-      totalPages = data.result.totalPage || 1;
-      for (const user of (data.result.list || [])) {
-        const account = String(user.account || user.userId || '');
-        if (account && !watchList.has(account)) {
-          watchList.set(account, { nickName: user.nick_name || user.nickName || account });
-          added++;
-        }
+    let p = 1, tp = 1, n = 0;
+    while (p <= tp) {
+      const d = await fc.favorites(p);
+      if (!d?.result) break;
+      tp = d.result.totalPage || 1;
+      for (const u of (d.result.list || [])) {
+        const a = String(u.account || u.userId || '');
+        if (a && !watchList.has(a)) { watchList.set(a, { nickName: u.nick_name || u.nickName || a }); n++; }
       }
-      page++;
+      p++;
     }
-    await sendMsg(chatId, `✅ <b>${added}</b> favoris ajoutes\nTotal: <b>${watchList.size}</b>\n\n/go pour demarrer`);
-  } catch (err) {
-    await sendMsg(chatId, `❌ Erreur: ${err.message}`);
-  }
+    return send(chatId, `✅ <b>${n}</b> favoris ajoutes\nTotal: <b>${watchList.size}</b>\n\n/go pour demarrer`);
+  } catch (e) { return send(chatId, `❌ ${e.message}`); }
 }
 
-async function startMonitoring(chatId) {
-  if (!facecastApi) { await sendMsg(chatId, '/config d\'abord'); return; }
-  if (watchList.size === 0) { await sendMsg(chatId, 'Liste vide! /watch ou /favorites'); return; }
-  if (monitoring) { await sendMsg(chatId, 'Deja en cours! /stop pour arreter'); return; }
-
+async function go(chatId) {
+  if (!fc.api) return send(chatId, '/login d\'abord');
+  if (!watchList.size) return send(chatId, 'Liste vide! /watch ou /favorites');
+  if (monitoring) return send(chatId, 'Deja en cours! /stop');
   monitoring = true;
-  await sendMsg(chatId, `▶️ <b>Surveillance ON</b>\n\n${watchList.size} broadcasters surveilles\nIntervalle: ${pollInterval}s\nMode: ${onlyPrivate ? '🔒 prives uniquement' : '🔓 tous'}\n\n<i>Tu recevras une notif + l'enregistrement quand un prive demarre et se termine.</i>`);
   startPoll();
+  return send(chatId, `▶️ <b>Surveillance ON</b>\n\n${watchList.size} broadcasters\nIntervalle: ${pollInterval}s\nMode: ${onlyPrivate ? '🔒 prives' : '🔓 tous'}`);
 }
 
-async function stopMonitoring(chatId) {
-  if (!monitoring) { await sendMsg(chatId, 'Pas en cours.'); return; }
+async function stop(chatId) {
+  if (!monitoring) return send(chatId, 'Pas en cours.');
   monitoring = false;
-  stopPoll();
-  for (const [userId, state] of streamStates) {
-    if (state.recording) await stopRecording(userId);
-  }
-  streamStates.clear();
-  await sendMsg(chatId, '⏹ <b>Surveillance OFF</b>');
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  for (const [uid, s] of streams) { if (s.recording) stopDownload(uid); }
+  streams.clear();
+  return send(chatId, '⏹ <b>Surveillance OFF</b>');
 }
 
-async function showStatus(chatId) {
-  let text = `<b>📊 Status</b>\n\n`;
-  text += `Surveillance: ${monitoring ? '🟢 Active' : '🔴 Off'}\n`;
-  text += `Mode: ${onlyPrivate ? '🔒 Prives' : '🔓 Tous'}\n`;
-  text += `Intervalle: ${pollInterval}s\n`;
-  text += `Watchlist: ${watchList.size}\n`;
-  text += `API: ${facecastApi ? '✅' : '❌'}\n\n`;
-
-  let recCount = 0;
-  for (const [uid, s] of streamStates) {
-    if (s.recording) {
-      recCount++;
-      const mins = Math.floor((Date.now() - s.startTime) / 60000);
-      text += `🔴 <b>${s.nickName}</b> - ${mins}min\n`;
-    }
+async function status(chatId) {
+  let t = `<b>📊 Status</b>\n\n`;
+  t += `Surveillance: ${monitoring ? '🟢' : '🔴'}\nMode: ${onlyPrivate ? '🔒' : '🔓'}\nIntervalle: ${pollInterval}s\nWatchlist: ${watchList.size}\nAPI: ${fc.api ? '✅' : '❌'}\n\n`;
+  let r = 0;
+  for (const [, s] of streams) {
+    if (s.recording) { r++; t += `🔴 <b>${s.nickName}</b> - ${Math.floor((Date.now() - s.start) / 60000)}min\n`; }
   }
-  if (recCount === 0) text += 'Aucun enregistrement en cours.';
-  await sendMsg(chatId, text);
+  if (!r) t += 'Aucun enregistrement.';
+  return send(chatId, t);
 }
 
 // ============================================================
-//  MONITORING LOOP
+//  POLL LOOP
 // ============================================================
 
 function startPoll() {
-  pollStreams().catch(err => console.error('[POLL]', err.message));
-  pollTimer = setInterval(() => {
-    if (monitoring) pollStreams().catch(err => console.error('[POLL]', err.message));
-  }, pollInterval * 1000);
-}
-
-function stopPoll() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  pollStreams();
+  pollTimer = setInterval(() => { if (monitoring) pollStreams(); }, pollInterval * 1000);
 }
 
 async function pollStreams() {
-  for (const [userId] of watchList) {
-    try { await checkUser(userId); } catch (err) {
-      console.error(`[POLL] ${userId}:`, err.message);
-    }
+  for (const [uid] of watchList) {
+    try { await checkUser(uid); } catch (e) { console.error(`[POLL] ${uid}:`, e.message); }
   }
 }
 
 async function checkUser(userId) {
-  const userInfo = await facecastApi.getUserInfo(userId);
-  if (!userInfo?.result) return;
+  const info = await fc.userInfo(userId);
+  if (!info?.result) return;
 
-  const nickName = userInfo.result.nickName || userId;
-  const isLive = facecastApi.isLive(userInfo);
-  const isPrivate = facecastApi.isPrivateStream(userInfo);
-  const state = streamStates.get(userId);
+  const nickName = fc.nick(info);
+  const live = fc.isLive(info);
+  const priv = fc.isPrivate(info);
+  const st = streams.get(userId);
 
   if (watchList.has(userId)) watchList.get(userId).nickName = nickName;
 
-  // Stream vient de demarrer
-  if (isLive && (!state || !state.live)) {
-    console.log(`[LIVE] ${nickName} (${userId})${isPrivate ? ' PRIVE' : ''}`);
+  // STREAM STARTED
+  if (live && (!st || !st.live)) {
+    console.log(`[LIVE] ${nickName} (${userId})${priv ? ' PRIVE' : ''}`);
 
-    // Si mode prive uniquement et pas prive -> skip
-    if (onlyPrivate && !isPrivate) {
-      streamStates.set(userId, { live: true, recording: false, nickName, isPrivate });
+    if (onlyPrivate && !priv) {
+      streams.set(userId, { live: true, recording: false, nickName, priv });
       return;
     }
 
-    // Verifier qu'on a acces au stream (= on est invite pour les prives)
-    const liveInfo = await facecastApi.getLiveInfo(userId);
-    const streamId = liveInfo?.result?.streamId;
-    if (!streamId) {
-      console.log(`[SKIP] ${nickName} - pas de streamId (pas invite?)`);
-      streamStates.set(userId, { live: true, recording: false, nickName, isPrivate });
-      return;
-    }
+    const li = await fc.liveInfo(userId);
+    const sid = fc.streamId(li);
+    if (!sid) { streams.set(userId, { live: true, recording: false, nickName, priv }); return; }
 
-    const urls = facecastApi.getStreamUrls(streamId);
-
-    // Verifier que le stream FLV est accessible
+    // Verifier acces
     try {
-      const check = await axios.head(urls.flv, { timeout: 5000 });
-      if (check.status !== 200) throw new Error('not 200');
+      await axios.head(fc.flvUrl(sid), { timeout: 5000 });
     } catch {
-      console.log(`[SKIP] ${nickName} - stream non accessible (pas invite)`);
-      streamStates.set(userId, { live: true, recording: false, nickName, isPrivate });
+      console.log(`[SKIP] ${nickName} - pas accessible`);
+      streams.set(userId, { live: true, recording: false, nickName, priv });
       return;
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-    const filename = `BuzzCast-${userId}-${nickName}-${streamId}-${timestamp}.flv`;
-    const filepath = path.join(RECORDINGS_DIR, filename);
-
-    // Enregistrer avec ffmpeg
-    const proc = spawn('ffmpeg', [
-      '-y', '-i', urls.flv, '-c', 'copy', '-t', '7200', filepath
-    ], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    proc.on('error', err => console.error(`[REC] ffmpeg error ${userId}:`, err.message));
-    proc.on('close', () => console.log(`[REC] ffmpeg closed ${userId}`));
-
-    streamStates.set(userId, {
-      live: true, recording: true, nickName, isPrivate,
-      filepath, filename, proc, startTime: Date.now()
-    });
-
-    const type = isPrivate ? '🔒 PRIVE' : '🔴 LIVE';
-    await sendMsg(ADMIN_CHAT_ID, `${type}\n\n<b>${nickName}</b> (${userId})\n\n🎬 Enregistrement en cours...\nFichier: <code>${filename}</code>`);
+    const dl = startDownload(userId, nickName, sid);
+    if (dl) {
+      streams.set(userId, { live: true, recording: true, nickName, priv, ...dl, start: Date.now() });
+      const icon = priv ? '🔒 PRIVE' : '🔴 LIVE';
+      await send(adminChatId, `${icon}\n\n<b>${nickName}</b> (${userId})\n🎬 Enregistrement...`);
+    }
   }
 
-  // Stream termine
-  if (!isLive && state?.live) {
-    console.log(`[OFFLINE] ${nickName} (${userId})`);
+  // STREAM ENDED
+  if (!live && st?.live) {
+    console.log(`[OFF] ${nickName} (${userId})`);
 
-    if (state.recording && state.proc) {
-      await stopRecording(userId);
+    if (st.recording) {
+      stopDownload(userId);
 
-      if (state.filepath && fs.existsSync(state.filepath)) {
-        const stat = fs.statSync(state.filepath);
-        const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
+      // Petit delai pour que le fichier soit finalise
+      await sleep(2000);
 
-        if (stat.size > 100000) { // > 100KB
-          const duration = Math.floor((Date.now() - state.startTime) / 1000);
-          const mins = Math.floor(duration / 60);
-          const secs = duration % 60;
-          const type = state.isPrivate ? '🔒 Prive' : '📹 Live';
+      if (st.filepath && fs.existsSync(st.filepath)) {
+        const size = fs.statSync(st.filepath).size;
+        const mb = (size / 1048576).toFixed(1);
 
-          await sendMsg(ADMIN_CHAT_ID, `⏹ <b>Stream termine</b>\n\n<b>${state.nickName}</b> (${userId})\nDuree: ${mins}m ${secs}s\nTaille: ${sizeMB} MB\n\n⏳ Envoi en cours...`);
+        if (size > 100000) {
+          const dur = Math.floor((Date.now() - st.start) / 1000);
+          const m = Math.floor(dur / 60), s = dur % 60;
+          const icon = st.priv ? '🔒' : '📹';
 
+          await send(adminChatId, `⏹ <b>Stream fini</b>\n\n<b>${st.nickName}</b> (${userId})\nDuree: ${m}m${s}s | ${mb} MB\n\n⏳ Envoi...`);
           try {
-            const caption = `${type} - ${state.nickName} (${userId})\nDuree: ${mins}m ${secs}s | ${sizeMB} MB`;
-            await sendVideo(ADMIN_CHAT_ID, state.filepath, caption);
-            await sendMsg(ADMIN_CHAT_ID, `✅ Enregistrement envoye!`);
-          } catch (err) {
-            await sendMsg(ADMIN_CHAT_ID, `❌ Erreur envoi: ${err.message}\nFichier local: ${state.filename}`);
+            await sendFile(adminChatId, st.filepath, `${icon} ${st.nickName} (${userId}) - ${m}m${s}s`);
+            await send(adminChatId, '✅ Envoye!');
+          } catch (e) {
+            await send(adminChatId, `❌ Erreur envoi: ${e.message}\nFichier: ${st.filename}`);
           }
         } else {
-          fs.unlinkSync(state.filepath);
+          fs.unlinkSync(st.filepath);
         }
       }
     }
-    streamStates.delete(userId);
+    streams.delete(userId);
   }
-}
-
-async function stopRecording(userId) {
-  const state = streamStates.get(userId);
-  if (!state?.proc) return;
-  return new Promise(resolve => {
-    state.proc.stdin.write('q');
-    state.proc.on('close', () => resolve());
-    setTimeout(() => { try { state.proc.kill('SIGKILL'); } catch {} resolve(); }, 10000);
-  });
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ============================================================
-//  STARTUP
+//  START
 // ============================================================
 
 if (!BOT_TOKEN) {
-  console.error('❌ BOT_TOKEN manquant!');
-  console.error('');
-  console.error('1. Cree un bot via @BotFather sur Telegram');
-  console.error('2. Lance: BOT_TOKEN=xxx ADMIN_CHAT_ID=yyy node bot.js');
+  console.log(`
+❌ BOT_TOKEN manquant!
+
+1. Va sur Telegram, cherche @BotFather
+2. Envoie /newbot et suis les etapes
+3. Copie le token
+4. Lance:  BOT_TOKEN=ton_token node bot.js
+  `);
   process.exit(1);
 }
 
-if (!ADMIN_CHAT_ID) {
-  console.error('❌ ADMIN_CHAT_ID manquant!');
-  console.error('');
-  console.error('1. Envoie /start a @userinfobot pour avoir ton chat ID');
-  console.error('2. Lance: BOT_TOKEN=xxx ADMIN_CHAT_ID=yyy node bot.js');
-  process.exit(1);
-}
+console.log('🤖 BuzzCast Recorder Bot');
+console.log(`📁 Recordings: ${RECORDINGS_DIR}`);
+if (adminChatId) console.log(`👤 Admin: ${adminChatId}`);
+else console.log('👤 Admin: auto-detect au premier /start');
+console.log('');
+console.log('Bot pret! Envoie /start sur Telegram.');
 
-console.log('========================================');
-console.log(' BuzzCast Telegram Recorder Bot');
-console.log('========================================');
-console.log(`Admin: ${ADMIN_CHAT_ID}`);
-console.log(`Recordings: ${RECORDINGS_DIR}`);
-console.log('========================================');
-
-pollTelegram();
+poll();
