@@ -1,0 +1,14 @@
+{
+  "name": "buzzcast-telegram-recorder",
+  "version": "1.0.0",
+  "description": "Record Buzzcast/Facecast private streams and send to Telegram",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "form-data": "^4.0.0",
+    "fs-extra": "^11.2.0"
+  }
+}

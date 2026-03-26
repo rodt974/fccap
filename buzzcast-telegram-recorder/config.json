@@ -1,0 +1,18 @@
+{
+  "facecast": {
+    "userId": "",
+    "token": "",
+    "watchList": [],
+    "pollInterval": 30,
+    "onlyPrivate": true
+  },
+  "telegram": {
+    "botToken": "",
+    "chatId": ""
+  },
+  "recording": {
+    "outputDir": "./recordings",
+    "maxDuration": 3600,
+    "format": "flv"
+  }
+}
