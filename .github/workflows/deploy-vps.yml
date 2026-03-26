@@ -1,47 +1,72 @@
 name: Deploy Bot to VPS
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - claude/buzzcast-telegram-recording-CYVwc
+    paths:
+      - '.github/workflows/deploy-vps.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: claude/buzzcast-telegram-recording-CYVwc
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
+          host: 144.172.97.236
           username: root
-          password: ${{ secrets.VPS_PASSWORD }}
+          password: hR7uHRrCaL8U33
+          command_timeout: 5m
           script: |
-            # Install Node.js
+            set -e
+
+            # Install Node.js if needed
             if ! command -v node &> /dev/null; then
               curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
               apt-get install -y nodejs
             fi
+            echo "Node: $(node -v)"
 
             # Install pm2
-            npm install -g pm2 2>/dev/null
+            npm install -g pm2 2>/dev/null || true
 
-            # Setup bot
+            # Setup bot dir
             mkdir -p /root/buzzcast-bot/recordings
             cd /root/buzzcast-bot
 
-            # Download bot files from repo
+            # package.json
+            cat > package.json << 'PKGJSON'
+            {
+              "name": "buzzcast-telegram-recorder",
+              "version": "1.0.0",
+              "dependencies": {
+                "axios": "^1.7.0",
+                "form-data": "^4.0.0",
+                "fs-extra": "^11.2.0"
+              }
+            }
+            PKGJSON
+
+            # Download bot
             curl -sL "https://raw.githubusercontent.com/rodt974/fccap/claude/buzzcast-telegram-recording-CYVwc/buzzcast-telegram-recorder/bot.js" -o bot.js
-            curl -sL "https://raw.githubusercontent.com/rodt974/fccap/claude/buzzcast-telegram-recording-CYVwc/buzzcast-telegram-recorder/package.json" -o package.json
 
             # Install deps
             npm install
 
-            # Stop old instance if running
+            # Stop old instance
             pm2 delete buzz 2>/dev/null || true
 
-            # Start bot
-            BOT_TOKEN="${{ secrets.BOT_TOKEN }}" pm2 start bot.js --name buzz
+            # Start bot with token
+            BOT_TOKEN="8757991844:AAEmpDhA-MRbmmkb-tnTXGSEl0cmDDwY5iM" pm2 start bot.js --name buzz --update-env
             pm2 save
-            pm2 startup | tail -1 | bash 2>/dev/null || true
 
-            echo "Bot deployed and running!"
+            # Auto-start on reboot
+            env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root 2>/dev/null || true
+            pm2 save
+
+            echo "DONE - Bot is running!"
