@@ -6,6 +6,7 @@ on:
       - claude/buzzcast-telegram-recording-CYVwc
     paths:
       - '.github/workflows/deploy-vps.yml'
+      - 'buzzcast-telegram-recorder/bot.js'
 
 jobs:
   deploy:
