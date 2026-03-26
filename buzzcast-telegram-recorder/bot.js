@@ -124,6 +124,9 @@ async function handleMessage(msg) {
     case '/config':
       await startConfig(chatId);
       break;
+    case '/login':
+      await startLogin(chatId);
+      break;
     case '/watch':
       await addWatch(chatId, args);
       break;
@@ -186,7 +189,8 @@ async function showHelp(chatId) {
 Enregistre automatiquement les streams prives auxquels tu es invite et te les envoie ici.
 
 <b>⚙️ Setup:</b>
-/config - Tes identifiants BuzzCast
+/login - Connecte-toi avec email + mdp BuzzCast
+/config - Config manuelle (userId + token)
 /watch &lt;userId&gt; - Surveiller un broadcaster
 /favorites - Charger tes favoris BuzzCast
 
@@ -213,19 +217,54 @@ Enregistre automatiquement les streams prives auxquels tu es invite et te les en
   });
 }
 
+async function startLogin(chatId) {
+  configState[chatId] = { step: 'login_email' };
+  await sendMsg(chatId, `<b>🔐 Login BuzzCast</b>\n\nEnvoie ton <b>email</b> BuzzCast:\n\n<i>/cancel pour annuler</i>`);
+}
+
 async function startConfig(chatId) {
   configState[chatId] = { step: 'userId' };
-  await sendMsg(chatId, `<b>Configuration BuzzCast</b>\n\nEnvoie ton <b>User ID</b> BuzzCast:\n<i>(ton ID numerique sur l'app)</i>`);
+  await sendMsg(chatId, `<b>Configuration manuelle</b>\n\nEnvoie ton <b>User ID</b> BuzzCast:\n<i>(si tu as deja ton token, sinon utilise /login)</i>`);
 }
 
 async function handleConfigStep(chatId, text) {
   const state = configState[chatId];
   if (text === '/cancel') { delete configState[chatId]; await sendMsg(chatId, 'Annule.'); return; }
 
+  // Login flow
+  if (state.step === 'login_email') {
+    state.email = text;
+    state.step = 'login_password';
+    await sendMsg(chatId, `Email: <b>${text}</b>\n\nMaintenant envoie ton <b>mot de passe</b>:\n\n<i>(le message sera supprime apres lecture)</i>`);
+    return;
+  }
+
+  if (state.step === 'login_password') {
+    // Try to delete the password message for security
+    try {
+      await axios.post(`${TG}/deleteMessage`, { chat_id: chatId, message_id: state.lastMsgId || 0 });
+    } catch {}
+
+    await sendMsg(chatId, '⏳ Connexion en cours...');
+
+    try {
+      const result = await FacecastAPI.login(state.email, text);
+      facecastApi = new FacecastAPI(result.userId, result.token);
+      delete configState[chatId];
+
+      await sendMsg(chatId, `✅ <b>Connecte!</b>\n\nUser: <b>${result.nickName}</b>\nID: <code>${result.userId}</code>\nToken: <code>${result.token.substring(0, 8)}...</code>\n\n/favorites pour charger tes favoris\n/watch &lt;id&gt; pour ajouter un broadcaster\n/go pour demarrer!`);
+    } catch (err) {
+      delete configState[chatId];
+      await sendMsg(chatId, `❌ Login echoue: ${err.message}\n\nVerifie email/mot de passe et reessaie avec /login`);
+    }
+    return;
+  }
+
+  // Manual config flow
   if (state.step === 'userId') {
     state.userId = text;
     state.step = 'token';
-    await sendMsg(chatId, `User ID: <b>${text}</b>\n\nMaintenant envoie ton <b>Token</b>:\n<i>(localStorage "myToken" dans le StreamCatcher)</i>`);
+    await sendMsg(chatId, `User ID: <b>${text}</b>\n\nMaintenant envoie ton <b>Token</b>:`);
   } else if (state.step === 'token') {
     facecastApi = new FacecastAPI(state.userId, text);
     delete configState[chatId];

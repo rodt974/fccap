@@ -13,6 +13,28 @@ class FacecastAPI {
     this.token = token;
   }
 
+  // Login avec email + mot de passe -> retourne { userId, token }
+  static async login(email, password) {
+    const url = `${BASE_URL}/api/sys/login/v2`;
+    const res = await axios.post(url, null, {
+      params: {
+        deviceId: '214035648725148',
+        email,
+        pwd: password,
+        type: 2
+      }
+    });
+    const data = res.data;
+    if (data.code === '40007' || data.msg !== 'Login successfully') {
+      throw new Error(data.msg || 'Login failed');
+    }
+    return {
+      userId: String(data.result.userId),
+      token: data.result.token,
+      nickName: data.result.nickName || ''
+    };
+  }
+
   async getUserInfo(targetUserId) {
     const url = `${BASE_URL}/tokens/PersonalHome/${randomSlashes()}findHomeUserInfo?userId=${targetUserId}`;
     const res = await axios.post(url, null, {
