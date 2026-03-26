@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BuzzCast Recorder</string>
+    <string name="title_settings">Configuration</string>
+    <string name="hint_user_id">Buzzcast User ID</string>
+    <string name="hint_token">Buzzcast Token</string>
+    <string name="hint_bot_token">Telegram Bot Token</string>
+    <string name="hint_chat_id">Telegram Chat ID</string>
+    <string name="hint_watch_ids">User IDs a surveiller (virgule)</string>
+    <string name="btn_start">Demarrer la surveillance</string>
+    <string name="btn_stop">Arreter</string>
+    <string name="btn_save">Sauvegarder config</string>
+    <string name="label_only_private">Enregistrer uniquement les prives</string>
+    <string name="label_poll_interval">Intervalle (secondes)</string>
+    <string name="label_status">Status</string>
+    <string name="channel_name">BuzzCast Recorder</string>
+    <string name="channel_desc">Notifications d enregistrement</string>
+</resources>
