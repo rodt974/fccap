@@ -23,26 +23,47 @@ const fc = {
   api: null, // { userId, token }
 
   async login(email, pwd) {
-    const res = await axios.post(`${FC_BASE}/api/sys/login/v2`, null, {
-      params: {
-        deviceId: '214035648725148',
-        email, pwd, type: 2,
-        device: 'SM-N975F',
-        platform: 'android',
-        language: 'en',
-        phone_country: 'US',
-        phone_lang: 'en',
-        appVersion: '3.2.61',
-        version: '3.2.61'
-      },
-      headers: {
-        'User-Agent': 'okhttp/4.9.3',
-        'Content-Type': 'application/x-www-form-urlencoded'
+    // Try multiple API versions (v2, v3, v4) and param combos
+    const versions = ['v4', 'v3', 'v2'];
+    let lastErr = 'Login failed';
+
+    for (const ver of versions) {
+      try {
+        const res = await axios({
+          method: 'POST',
+          url: `${FC_BASE}/api/sys/login/${ver}`,
+          params: {
+            deviceId: '354035648725148',
+            email, pwd, type: 2,
+            device: 'SM-S928B',
+            platform: 'android',
+            language: 'en',
+            phone_country: 'US',
+            phone_lang: 'en',
+            appVersion: '3.2.66',
+            version: '3.2.66',
+            timeZone: 'America/New_York'
+          },
+          headers: {
+            'User-Agent': 'okhttp/4.12.0',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'Connection': 'keep-alive',
+            'app-version': '3.2.66',
+            'device-type': 'android'
+          },
+          timeout: 15000
+        });
+        const d = res.data;
+        if (d.result && d.result.token) {
+          return { userId: String(d.result.userId), token: d.result.token, nickName: d.result.nickName || '' };
+        }
+        lastErr = d.msg || `${ver} failed`;
+      } catch (e) {
+        lastErr = `${ver}: ${e.response?.data?.msg || e.message}`;
       }
-    });
-    const d = res.data;
-    if (d.code === '40007' || d.msg !== 'Login successfully') throw new Error(d.msg || 'Login failed');
-    return { userId: String(d.result.userId), token: d.result.token, nickName: d.result.nickName || '' };
+    }
+    throw new Error(lastErr);
   },
 
   async userInfo(uid) {
@@ -239,10 +260,38 @@ async function onMsg(msg) {
         return send(chatId, `Intervalle: <b>${pollInterval}s</b>`);
       }
       return send(chatId, `Actuel: ${pollInterval}s\nUsage: /interval 30`);
+    case '/test':
+      return testApi(chatId, args);
     default:
       if (/^\d{4,}$/.test(text)) return watch(chatId, text);
       return help(chatId);
   }
+}
+
+async function testApi(chatId, email) {
+  if (!email) return send(chatId, 'Usage: /test email@example.com mdp');
+  const parts = email.split(' ');
+  const e = parts[0], p = parts.slice(1).join(' ');
+  if (!p) return send(chatId, 'Usage: /test email@example.com mdp');
+
+  const versions = ['v4','v3','v2'];
+  let results = '';
+  for (const ver of versions) {
+    try {
+      const res = await axios({
+        method:'POST',
+        url:`${FC_BASE}/api/sys/login/${ver}`,
+        params:{deviceId:'354035648725148',email:e,pwd:p,type:2,device:'SM-S928B',platform:'android',language:'en',appVersion:'3.2.66',version:'3.2.66'},
+        headers:{'User-Agent':'okhttp/4.12.0','Content-Type':'application/x-www-form-urlencoded','app-version':'3.2.66'},
+        timeout:15000
+      });
+      results += `<b>${ver}</b>: code=${res.data.code} msg=${res.data.msg}\n`;
+      if (res.data.result) results += `token=${String(res.data.result.token||'').substring(0,10)}...\n`;
+    } catch(err) {
+      results += `<b>${ver}</b>: ${err.response?.status||''} ${err.response?.data?.msg||err.message}\n`;
+    }
+  }
+  return send(chatId, `<b>API Test:</b>\n\n${results}`);
 }
 
 async function onCb(q) {
