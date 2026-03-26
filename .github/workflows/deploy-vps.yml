@@ -1,13 +1,10 @@
-# v3
+# v4
 name: Deploy Bot to VPS
 
 on:
   push:
     branches:
       - claude/buzzcast-telegram-recording-CYVwc
-    paths:
-      - '.github/workflows/deploy-vps.yml'
-      - 'buzzcast-telegram-recorder/bot.js'
 
 jobs:
   deploy:
@@ -16,6 +13,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: claude/buzzcast-telegram-recording-CYVwc
+
+      - name: Copy bot.js to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 144.172.97.236
+          username: root
+          password: hR7uHRrCaL8U33
+          source: "buzzcast-telegram-recorder/bot.js,buzzcast-telegram-recorder/package.json"
+          target: "/root/buzzcast-bot/"
+          strip_components: 1
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -37,33 +44,15 @@ jobs:
             # Install pm2
             npm install -g pm2 2>/dev/null || true
 
-            # Setup bot dir
+            # Setup
             mkdir -p /root/buzzcast-bot/recordings
             cd /root/buzzcast-bot
-
-            # package.json
-            cat > package.json << 'PKGJSON'
-            {
-              "name": "buzzcast-telegram-recorder",
-              "version": "1.0.0",
-              "dependencies": {
-                "axios": "^1.7.0",
-                "form-data": "^4.0.0",
-                "fs-extra": "^11.2.0"
-              }
-            }
-            PKGJSON
-
-            # Download bot
-            curl -sL "https://raw.githubusercontent.com/rodt974/fccap/claude/buzzcast-telegram-recording-CYVwc/buzzcast-telegram-recorder/bot.js" -o bot.js
 
             # Install deps
             npm install
 
-            # Stop old instance
+            # Restart bot
             pm2 delete buzz 2>/dev/null || true
-
-            # Start bot with token
             BOT_TOKEN="8757991844:AAEmpDhA-MRbmmkb-tnTXGSEl0cmDDwY5iM" pm2 start bot.js --name buzz --update-env
             pm2 save
 
@@ -71,4 +60,4 @@ jobs:
             env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root 2>/dev/null || true
             pm2 save
 
-            echo "DONE - Bot is running!"
+            echo "DONE"
