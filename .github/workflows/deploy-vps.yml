@@ -1,4 +1,4 @@
-# v4
+# v5
 name: Deploy Bot to VPS
 
 on:
@@ -10,20 +10,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: claude/buzzcast-telegram-recording-CYVwc
-
-      - name: Copy bot.js to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: 144.172.97.236
-          username: root
-          password: hR7uHRrCaL8U33
-          source: "buzzcast-telegram-recorder/bot.js,buzzcast-telegram-recorder/package.json"
-          target: "/root/buzzcast-bot/"
-          strip_components: 1
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -34,30 +20,31 @@ jobs:
           script: |
             set -e
 
-            # Install Node.js if needed
             if ! command -v node &> /dev/null; then
               curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
               apt-get install -y nodejs
             fi
-            echo "Node: $(node -v)"
 
-            # Install pm2
             npm install -g pm2 2>/dev/null || true
 
-            # Setup
-            mkdir -p /root/buzzcast-bot/recordings
-            cd /root/buzzcast-bot
+            # Clone or pull latest
+            if [ -d /root/buzzcast-bot/.git ]; then
+              cd /root/buzzcast-bot
+              git fetch origin
+              git reset --hard origin/claude/buzzcast-telegram-recording-CYVwc
+            else
+              rm -rf /root/buzzcast-bot
+              git clone -b claude/buzzcast-telegram-recording-CYVwc https://github.com/rodt974/fccap.git /root/buzzcast-bot
+            fi
 
-            # Install deps
+            cd /root/buzzcast-bot/buzzcast-telegram-recorder
+            mkdir -p recordings
             npm install
 
-            # Restart bot
             pm2 delete buzz 2>/dev/null || true
             BOT_TOKEN="8757991844:AAEmpDhA-MRbmmkb-tnTXGSEl0cmDDwY5iM" pm2 start bot.js --name buzz --update-env
             pm2 save
-
-            # Auto-start on reboot
             env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root 2>/dev/null || true
             pm2 save
 
-            echo "DONE"
+            echo "DEPLOYED OK"
