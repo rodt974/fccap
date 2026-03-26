@@ -24,7 +24,21 @@ const fc = {
 
   async login(email, pwd) {
     const res = await axios.post(`${FC_BASE}/api/sys/login/v2`, null, {
-      params: { deviceId: '214035648725148', email, pwd, type: 2 }
+      params: {
+        deviceId: '214035648725148',
+        email, pwd, type: 2,
+        device: 'SM-N975F',
+        platform: 'android',
+        language: 'en',
+        phone_country: 'US',
+        phone_lang: 'en',
+        appVersion: '3.2.61',
+        version: '3.2.61'
+      },
+      headers: {
+        'User-Agent': 'okhttp/4.9.3',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
     });
     const d = res.data;
     if (d.code === '40007' || d.msg !== 'Login successfully') throw new Error(d.msg || 'Login failed');
